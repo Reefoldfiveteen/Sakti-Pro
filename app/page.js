@@ -642,7 +642,6 @@ export default function Home() {
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
           <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             {/* 🌟 LINGKARAN GRADASI TIGA WARNA AMAN */}
             <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: gradienPieDinamis, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard }}>
