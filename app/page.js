@@ -647,7 +647,7 @@ export default function Home() {
             {/* 🌟 LINGKARAN GRADASI TIGA WARNA AMAN */}
             <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: gradienPieDinamis, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard }}>
               <span style={{ fontSize: '12px', fontWeight: '800', color: theme.textUtama }}>
-                {metrik.totalTransaksiCount > 0 ? 'Aktif' : '0%'}
+                {metrik.totalTransaksiCount > 0 ? 'Persen (%)' : '0%'}
               </span>
             </div>
             <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px' }}>
