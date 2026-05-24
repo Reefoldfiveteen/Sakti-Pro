@@ -11,6 +11,16 @@ export default function Home() {
   const [errorPesan, setErrorPesan] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
+  // 🌟 ENGINE DETEKTOR RESPONSIVE LIVE WINDOW WIDTH
+  const [lebarLayar, setLebarLayar] = useState(typeof window !== 'undefined' ? window.innerWidth : 1150);
+  const isMobile = lebarLayar <= 768;
+
+  useEffect(() => {
+    const handleResize = () => setLebarLayar(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // State Manajemen Preview Audio
   const [audioUrlPreview, setAudioUrlPreview] = useState('');
   const [audioBase64, setAudioBase64] = useState('');
@@ -150,7 +160,6 @@ export default function Home() {
     const untungBersih = (omzet + pemasukanLain) - pengeluaran;
     const totalTransaksiCount = omzet + pengeluaran + pemasukanLain;
 
-    // 🌟 SEGMEN PERSENTASE BARU UNTUK GRAFIK TIGA DIMENSI/ARAH (WEB PIE CHART)
     const persenJual = totalTransaksiCount > 0 ? Math.round((omzet / totalTransaksiCount) * 100) : 0;
     const persenKeluar = totalTransaksiCount > 0 ? Math.round((pengeluaran / totalTransaksiCount) * 100) : 0;
     const persenMasuk = totalTransaksiCount > 0 ? Math.round((pemasukanLain / totalTransaksiCount) * 100) : 0;
@@ -467,7 +476,7 @@ export default function Home() {
       barisData.push(["Metrik Keuangan", "Nilai Nominal", "Status Evaluasi Bisnis"]);
       barisData.push(["💰 Total Omzet Penjualan", metrik.omzet, "Pendapatan Kotor Toko"]);
       barisData.push(["💸 Total Biaya / Pengeluaran", metrik.pengeluaran, "Biaya Operasional & Kulakan"]);
-      barisData.push(["💎 Total Pemasukan Tambahan", metrik.pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); // 🌟 INJEKSI BARIS PEMASUKAN BARU DI B8
+      barisData.push(["💎 Total Pemasukan Tambahan", metrik.pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); 
       barisData.push([
         "📈 Profit Bersih Toko", 
         metrik.untungBersih, 
@@ -519,7 +528,6 @@ export default function Home() {
         { width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }
       ];
 
-      // Format Rupiah diperlebar sampai baris B9 karena ada baris pemasukan baru
       ['B6', 'B7', 'B8', 'B9'].forEach(cellRef => {
         const cell = worksheet.getCell(cellRef);
         if (cell.value !== undefined) {
@@ -527,9 +535,6 @@ export default function Home() {
         }
       });
 
-      // =================================================================
-      // 📊 UPGRADE RUMUS EXCEL NATIVE 3 ARAH (PENJUALAN, OPERASIONAL, SUNTIKAN MODAL)
-      // =================================================================
       worksheet.getCell('F4').value = "📊 VISUALISASI CASHFLOW RATIO (DINAMIS TIGA SEGMEN)";
       worksheet.getCell('F4').font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
 
@@ -565,29 +570,28 @@ export default function Home() {
     }
   };
 
-  // Perhitungan derajat keliling conic-gradient lingkaran (Pie Segmen)
   const degJual = metrik.totalTransaksiCount > 0 ? (metrik.omzet / metrik.totalTransaksiCount) * 360 : 120;
   const degKeluar = metrik.totalTransaksiCount > 0 ? (metrik.pengeluaran / metrik.totalTransaksiCount) * 360 : 120;
   const gradienPieDinamis = `conic-gradient(#10B981 0deg ${degJual}deg, #EF4444 ${degJual}deg ${degJual + degKeluar}deg, #3F51B5 ${degJual + degKeluar}deg 360deg)`;
 
   return (
-    <div style={{ maxWidth: '1150px', margin: '40px auto', padding: '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: theme.bgApp, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
+    <div style={{ maxWidth: '1150px', margin: isMobile ? '10px auto' : '40px auto', padding: isMobile ? '12px' : '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: theme.bgApp, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
       
-      {/* 🌟 INTEGRASI HEADER LOGO COMPONENT DAN JARGON BARU */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '35px', flexWrap: 'wrap', gap: '15px' }}>
+      {/* HEADER LOGO COMPONENT */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px', flexDirection: isMobile ? 'column' : 'row', gap: '15px' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: '2px', marginLeft: '-15px' }}>
+          <div style={{ marginBottom: '2px', marginLeft: isMobile ? '0px' : '-15px' }}>
             <LogoSakti id="LogoUtamaSakti" isDark={isMurniGelap} />
           </div>
-          <p style={{ color: theme.textMuted, marginTop: '-5px', marginLeft: '15px', margin: '0', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px', fontStyle: 'italic' }}>
+          <p style={{ color: theme.textMuted, marginTop: '-5px', marginLeft: isMobile ? '0px' : '15px', margin: '0', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px', fontStyle: 'italic' }}>
             "Dikte Transaksinya, Amankan Keuangannya, Kuasai Pasarnya."
           </p>
         </div>
 
         {/* CONTROLLER SWITCH TEMA */}
-        <div style={{ display: 'flex', backgroundColor: theme.thBg, padding: '4px', borderRadius: '10px', border: `1px solid ${theme.border}`, marginTop: '10px' }}>
+        <div style={{ display: 'flex', backgroundColor: theme.thBg, padding: '4px', borderRadius: '10px', border: `1px solid ${theme.border}`, width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
           {['light', 'dark', 'system'].map((t) => (
-            <button key={t} onClick={() => setModeTema(t)} style={{ padding: '6px 12px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', textTransform: 'capitalize', backgroundColor: modeTema === t ? '#4F46E5' : 'transparent', color: modeTema === t ? '#FFFFFF' : theme.textMuted, transition: 'all 0.2s ease' }}>
+            <button key={t} onClick={() => setModeTema(t)} style={{ flex: isMobile ? 1 : 'none', padding: '6px 12px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', textTransform: 'capitalize', backgroundColor: modeTema === t ? '#4F46E5' : 'transparent', color: modeTema === t ? '#FFFFFF' : theme.textMuted, transition: 'all 0.2s ease' }}>
               {t === 'light' ? '☀️ Light' : t === 'dark' ? '🌙 Dark' : '💻 System'}
             </button>
           ))}
@@ -595,29 +599,28 @@ export default function Home() {
       </div>
 
 
-      {/* MANAGEMENT PANEL KARTU METRIK UTAMA TOKO */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '25px' }}>
-        <div style={{ backgroundColor: isMurniGelap ? '#065F46' : '#E6F4EA', padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: isMurniGelap ? '#A7F3D0' : '#137333', textTransform: 'uppercase' }}>💰 Total Omzet Penjualan</span>
-          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: '22px', fontWeight: '800' }}>Rp {metrik.omzet.toLocaleString('id-ID')}</h2>
+      {/* PANEL KARTU METRIK UTAMA TOKO (RESPONSIVE GRID) */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: isMobile ? '10px' : '20px', marginBottom: '25px' }}>
+        <div style={{ backgroundColor: isMurniGelap ? '#065F46' : '#E6F4EA', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#A7F3D0' : '#137333', textTransform: 'uppercase' }}>💰 Total Omzet Penjualan</span>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.omzet.toLocaleString('id-ID')}</h2>
         </div>
-        <div style={{ backgroundColor: isMurniGelap ? '#991B1B' : '#FCE8E6', padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: isMurniGelap ? '#FCA5A5' : '#C5221F', textTransform: 'uppercase' }}>💸 Total Biaya / Pengeluaran</span>
-          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: '22px', fontWeight: '800' }}>Rp {metrik.pengeluaran.toLocaleString('id-ID')}</h2>
+        <div style={{ backgroundColor: isMurniGelap ? '#991B1B' : '#FCE8E6', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#FCA5A5' : '#C5221F', textTransform: 'uppercase' }}>💸 Biaya / Keluar</span>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pengeluaran.toLocaleString('id-ID')}</h2>
         </div>
-        {/* 🌟 PENAMBAHAN KARTU INDIKATOR MODAL / PEMASUKAN BARU DI DASHBOARD UTAMA */}
-        <div style={{ backgroundColor: isMurniGelap ? '#1E3A8A' : '#E0E7FF', padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: isMurniGelap ? '#93C5FD' : '#3730A3', textTransform: 'uppercase' }}>💎 Suntikan / Pemasukan Lain</span>
-          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: '22px', fontWeight: '800' }}>Rp {metrik.pemasukanLain.toLocaleString('id-ID')}</h2>
+        <div style={{ backgroundColor: isMurniGelap ? '#1E3A8A' : '#E0E7FF', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#93C5FD' : '#3730A3', textTransform: 'uppercase' }}>💎 Pemasukan Lain</span>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pemasukanLain.toLocaleString('id-ID')}</h2>
         </div>
-        <div style={{ backgroundColor: metrik.untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: metrik.untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
-          <h2 style={{ margin: '8px 0 0 0', color: theme.textUtama, fontSize: '22px', fontWeight: '800' }}>Rp {metrik.untungBersih.toLocaleString('id-ID')}</h2>
+        <div style={{ backgroundColor: metrik.untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: metrik.untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
+          <h2 style={{ margin: '4px 0 0 0', color: theme.textUtama, fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.untungBersih.toLocaleString('id-ID')}</h2>
         </div>
       </div>
 
       {/* VISUALISASI GRAFIK TOKO UMKM */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginBottom: '25px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <h4 style={{ margin: '0 0 16px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📦 TOP 3 PRODUK TERLARIS (STOK FAST-MOVING)</h4>
           {metrik.produkTerlaris.length === 0 ? (
@@ -641,34 +644,31 @@ export default function Home() {
 
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
-          <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            {/* 🌟 LINGKARAN GRADASI TIGA WARNA AMAN */}
-            <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: gradienPieDinamis, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'left' }}>
+            <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: gradienPieDinamis, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard, flexShrink: 0 }}>
               <span style={{ fontSize: '12px', fontWeight: '800', color: theme.textUtama }}>
-                {metrik.totalTransaksiCount > 0 ? '' : '0%'}
+                {metrik.totalTransaksiCount > 0 ? 'Kasir' : '0%'}
               </span>
             </div>
-            <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({metrik.persenJual}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({metrik.persenKeluar}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({metrik.persenMasuk}%)</div>
+            <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({metrik.persenJual}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({metrik.persenKeluar}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({metrik.persenMasuk}%)</div>
             </div>
           </div>
-        </div>
         </div>
       </div>
 
       {/* CLOUD MANAGER */}
-      <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, padding: '20px', borderRadius: '16px', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+      <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, padding: '16px', borderRadius: '16px', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', gap: '15px', textAlign: isMobile ? 'center' : 'left' }}>
         <div>
           <h4 style={{ margin: '0 0 4px 0', color: theme.textUtama, fontWeight: '700', fontSize: '15px' }}>☁️ Cloud Synchronizer Storage</h4>
-          <p style={{ margin: '0', fontSize: '12px', color: theme.textMuted }}>Status Terkini: <strong style={{ color: statusSync.includes('✨') || statusSync.includes('☁️') ? '#10B981' : '#F59E0B' }}>{statusSync}</strong></p>
+          <p style={{ margin: '0', fontSize: '12px', color: theme.textMuted }}>Status: <strong style={{ color: statusSync.includes('✨') || statusSync.includes('☁️') ? '#10B981' : '#F59E0B' }}>{statusSync}</strong></p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
           {isLoggedInGDrive && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', backgroundColor: isMurniGelap ? '#0F172A' : '#F1F5F9', padding: '6px 12px', borderRadius: '8px', color: theme.textUtama, fontWeight: '600', border: `1px solid ${theme.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', backgroundColor: isMurniGelap ? '#0F172A' : '#F1F5F9', padding: '6px 12px', borderRadius: '8px', color: theme.textUtama, fontWeight: '600', border: `1px solid ${theme.border}`, width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
               <label htmlFor="sync-select">⏰ Auto Sync:</label>
               <select id="sync-select" value={intervalSync} onChange={(e) => setIntervalSync(e.target.value)} style={{ padding: '4px', fontWeight: '700', border: `1px solid ${theme.border}`, borderRadius: '4px', backgroundColor: theme.bgCard, color: theme.textUtama }}>
                 <option value="manual">Manual Only</option>
@@ -679,15 +679,15 @@ export default function Home() {
           )}
 
           {!isLoggedInGDrive ? (
-            <button onClick={handleLoginGDrive} disabled={isSyncing} style={{ padding: '10px 18px', backgroundColor: '#2563EB', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
+            <button onClick={handleLoginGDrive} disabled={isSyncing} style={{ width: isMobile ? '100%' : 'auto', padding: '10px 18px', backgroundColor: '#2563EB', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
               {isSyncing ? '🔄 Menghubungkan...' : '🔗 Hubungkan Google Drive'}
             </button>
           ) : (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={handleSyncToGoogleDrive} disabled={isSyncing} style={{ padding: '10px 18px', backgroundColor: '#10B981', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto', flexDirection: isMobile ? 'column' : 'row' }}>
+              <button onClick={handleSyncToGoogleDrive} disabled={isSyncing} style={{ flex: 1, padding: '10px 18px', backgroundColor: '#10B981', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
                 {isSyncing ? '🔄 Menyinkronkan...' : '🔄 Sync Sekarang'}
               </button>
-              <button onClick={handleLogoutGDrive} style={{ padding: '10px 18px', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
+              <button onClick={handleLogoutGDrive} style={{ flex: 1, padding: '10px 18px', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
                 🚪 Unlink Akun
               </button>
             </div>
@@ -701,144 +701,233 @@ export default function Home() {
         </div>
       )}
 
-      {/* CONTROL INTERFACE */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', marginBottom: '40px' }}>
-        <div style={{ border: `1px solid ${theme.border}`, padding: '24px', borderRadius: '16px', backgroundColor: theme.bgCard, opacity: isLoading ? 0.6 : 1 }}>
-          <label style={{ display: 'block', fontWeight: '700', color: theme.textUtama, fontSize: '14px', marginBottom: '14px' }}>🎙️ AUDIO WORKSTATION (KENDALI MANUAL TOTAL)</label>
+      {/* CONTROL INTERFACE (🌟 REFRESH GRID MENJADI RESPONSIF) */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr', gap: '24px', marginBottom: '40px' }}>
+        <div style={{ border: `1px solid ${theme.border}`, padding: isMobile ? '16px' : '24px', borderRadius: '16px', backgroundColor: theme.bgCard, opacity: isLoading ? 0.6 : 1 }}>
+          <label style={{ display: 'block', fontWeight: '700', color: theme.textUtama, fontSize: '13px', marginBottom: '14px' }}>🎙️ AUDIO WORKSTATION (KENDALI MANUAL TOTAL)</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-            <button type="button" disabled={isLoading} onClick={isRecording ? handleStopRekam : handleMulaiRekam} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #6366F1', backgroundColor: isRecording ? '#EF4444' : (isMurniGelap ? '#312E81' : '#EEF2FF'), color: isRecording ? '#FFF' : '#6366F1', fontWeight: '700', cursor: 'pointer' }}>
-              {isRecording ? '🛑 Selesai & Kunci Suara' : '🎙️ Mulai Rekam Mic'}
+            <button type="button" disabled={isLoading} onClick={isRecording ? handleStopRekam : handleMulaiRekam} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #6366F1', backgroundColor: isRecording ? '#EF4444' : (isMurniGelap ? '#312E81' : '#EEF2FF'), color: isRecording ? '#FFF' : '#6366F1', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+              {isRecording ? '🛑 Kunci Suara' : '🎙️ Rekam Mic'}
             </button>
-            <label htmlFor="upload-audio" style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: '8px', border: '1px dashed #10B981', backgroundColor: isMurniGelap ? '#064E3B' : '#F0FDF4', color: isMurniGelap ? '#A7F3D0' : '#047857', fontWeight: '700', cursor: 'pointer', fontSize: '13px', opacity: isLoading ? 0.5 : 1 }}>📁 Berkas Audio (.mp3)</label>
+            <label htmlFor="upload-audio" style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: '8px', border: '1px dashed #10B981', backgroundColor: isMurniGelap ? '#064E3B' : '#F0FDF4', color: isMurniGelap ? '#A7F3D0' : '#047857', fontWeight: '700', cursor: 'pointer', fontSize: '13px', opacity: isLoading ? 0.5 : 1 }}>📁 Berkas Audio</label>
             <input id="upload-audio" type="file" accept="audio/*" onChange={handleUploadAudio} disabled={isLoading} style={{ display: 'none' }} />
           </div>
           {audioUrlPreview && <audio src={audioUrlPreview} controls style={{ width: '100%', marginBottom: '14px' }} />}
           <input type="text" placeholder="Hasil dikte muncul di sini..." value={inputText} onChange={(e) => setInputText(e.target.value)} disabled={isLoading} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, marginBottom: '14px', boxSizing: 'border-box', backgroundColor: theme.inputBg, color: theme.textUtama }} />
           
           <button type="button" onClick={handleKirimData} disabled={isLoading} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: isLoading ? '#94A3B8' : (isMurniGelap ? '#4F46E5' : '#1E293B'), color: '#FFFFFF', fontWeight: '700', cursor: 'pointer' }}>
-            {isLoading ? '⏳ Sedang memproses data...' : '⚡ Proses Masuk Tabel'}
+            {isLoading ? '⏳ Sedang memproses...' : '⚡ Proses Masuk Tabel'}
           </button>
         </div>
 
-        <div style={{ border: `1px solid ${theme.border}`, padding: '24px', borderRadius: '16px', backgroundColor: theme.bgCard, display: 'flex', flexDirection: 'column', justifyContent: 'center', opacity: isLoading ? 0.6 : 1 }}>
-          <label style={{ display: 'block', fontWeight: '700', color: theme.textUtama, fontSize: '14px', textAlign: 'center', marginBottom: '16px' }}>📷 SCAN NOTA BELANJA FISIK (VISION)</label>
+        <div style={{ border: `1px solid ${theme.border}`, padding: isMobile ? '24px 16px' : '24px', borderRadius: '16px', backgroundColor: theme.bgCard, display: 'flex', flexDirection: 'column', justifyContent: 'center', opacity: isLoading ? 0.6 : 1 }}>
+          <label style={{ display: 'block', fontWeight: '700', color: theme.textUtama, fontSize: '13px', textAlign: 'center', marginBottom: '16px' }}>📷 SCAN NOTA BELANJA FISIK (VISION)</label>
           <label htmlFor="upload-nota" style={{ display: 'block', textAlign: 'center', padding: '16px', borderRadius: '8px', backgroundColor: isLoading ? '#94A3B8' : '#10B981', color: '#FFFFFF', fontWeight: '700', cursor: 'pointer' }}>
-            {isLoading ? '⏳ Sedang memproses data...' : '📂 Pilih / Foto Nota Belanja'}
+            {isLoading ? '⏳ Sedang memproses...' : '📂 Pilih / Foto Nota Belanja'}
           </label>
           <input id="upload-nota" type="file" accept="image/*" onChange={handleUploadFoto} disabled={isLoading} style={{ display: 'none' }} />
         </div>
       </div>
 
       {/* MAIN DATA TABLE WORKBENCH */}
-      <div style={{ backgroundColor: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '24px' }}>
+      <div style={{ backgroundColor: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: isMobile ? '14px' : '24px' }}>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px', flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'left' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: isMobile ? '100%' : 'auto' }}>
             <h3 style={{ color: theme.textUtama, margin: '0', fontSize: '16px', fontWeight: '700' }}>📋 Rekapitulasi Rincian Barang Transaksi</h3>
             <span style={{ fontSize: '12px', color: theme.textMuted }}>Jumlah Baris Tabel Saat Ini: {daftarTransaksi.length}</span>
           </div>
           
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', flexDirection: isMobile ? 'column' : 'row' }}>
             {daftarTransaksi.length > 0 && (
-              <button type="button" onClick={handleHapusSemuaData} disabled={isLoading} style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #EF4444', backgroundColor: 'transparent', color: '#EF4444', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>🗑️ Kosongkan Tabel</button>
+              <button type="button" onClick={handleHapusSemuaData} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: '1px solid #EF4444', backgroundColor: 'transparent', color: '#EF4444', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>🗑️ Kosongkan</button>
             )}
-            <button type="button" onClick={handleExportExcel} disabled={isLoading} style={{ padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#FFFFFF', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>📊 Export .xlsx Excel</button>
+            <button type="button" onClick={handleExportExcel} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#FFFFFF', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>📊 Export Excel</button>
           </div>
         </div>
 
-        {/* DATA TABLE ROWS GRID */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-            <thead>
-              <tr style={{ backgroundColor: theme.thBg, borderBottom: `2px solid ${theme.border}`, color: theme.thText, fontSize: '12px', fontWeight: '800' }}>
-                <th style={{ padding: '14px', width: '22%' }}>WAKTU / GRUP</th>
-                <th style={{ padding: '14px', width: '28%' }}>NAMA ITEM / BARANG</th>
-                <th style={{ padding: '14px', width: '10%', textAlign: 'center' }}>QTY</th>
-                <th style={{ padding: '14px', width: '15%', textAlign: 'right' }}>HARGA SATUAN</th>
-                <th style={{ padding: '14px', width: '13%', textAlign: 'right' }}>SUBTOTAL</th>
-                <th style={{ padding: '14px', width: '12%', textAlign: 'center' }}>AKSI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {daftarTransaksi.length === 0 ? (
-                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: theme.textMuted }}>Belum ada data transaksi.</td></tr>
-              ) : (
-                daftarTransaksi.map((transaksi, tIdx) => {
-                  const isGrupSedangEdit = editingGroupIdx === tIdx;
-                  return [
-                    <tr key={`grup-${tIdx}`} style={{ backgroundColor: theme.bgGrupRow, borderBottom: `1px solid ${theme.border}`, fontWeight: '700', fontSize: '13px', color: theme.textUtama }}>
-                      <td style={{ padding: '10px 12px' }}>
+        {/* 🌟 STRATEGI SWITCH INTERFACE REKAP: RUNNER CARD-LIST UNTUK LAYAR MOBILE MOBILE ACCESSIBILITY */}
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
+            {daftarTransaksi.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: theme.textMuted, fontSize: '13px' }}>Belum ada data transaksi.</div>
+            ) : (
+              daftarTransaksi.map((transaksi, tIdx) => {
+                const isGrupSedangEdit = editingGroupIdx === tIdx;
+                return (
+                  <div key={`card-grup-${tIdx}`} style={{ backgroundColor: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}`, overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                    {/* Header Card (Waktu & Tipe) */}
+                    <div style={{ backgroundColor: theme.bgGrupRow, padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
                         {isGrupSedangEdit ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <input type="date" value={editTanggal} onChange={(e) => setEditTanggal(e.target.value)} style={{ padding: '6px', fontSize: '12px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} />
-                            <input type="text" value={editJam} placeholder="HH:MM" onChange={(e) => setEditJam(e.target.value)} style={{ padding: '6px', fontSize: '12px', width: '60px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} />
+                            <input type="date" value={editTanggal} onChange={(e) => setEditTanggal(e.target.value)} style={{ padding: '4px', fontSize: '12px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
+                            <input type="text" value={editJam} placeholder="HH:MM" onChange={(e) => setEditJam(e.target.value)} style={{ padding: '4px', fontSize: '12px', width: '60px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
                           </div>
-                        ) : (<>📅 {transaksi.tanggal} <br/><span style={{ fontSize: '11px', color: theme.textMuted, fontWeight: '500' }}>({transaksi.jam} WIB)</span></>)}
-                      </td>
-                      <td style={{ padding: '10px 12px' }}>
+                        ) : (
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: theme.textUtama }}>📅 {transaksi.tanggal} ({transaksi.jam})</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {isGrupSedangEdit ? (
-                          <select value={editJenis} onChange={(e) => setEditJenis(e.target.value)} style={{ padding: '6px', fontWeight: '700', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }}>
+                          <select value={editJenis} onChange={(e) => setEditJenis(e.target.value)} style={{ padding: '4px', fontWeight: '700', borderRadius: '4px', fontSize: '12px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }}>
                             <option value="Penjualan">PENJUALAN</option>
                             <option value="Pengeluaran">PENGELUARAN</option>
                             <option value="Pemasukan">PEMASUKAN</option>
                           </select>
                         ) : (
-                          <>
-                            <span style={{ 
-                              backgroundColor: transaksi.jenis === 'Penjualan' ? '#10B981' : transaksi.jenis === 'Pemasukan' ? '#3F51B5' : '#F59E0B', 
-                              color: '#FFFFFF', 
-                              padding: '3px 8px', 
-                              borderRadius: '6px', 
-                              fontSize: '11px', 
-                              marginRight: '10px' 
-                            }}>
-                              {transaksi.jenis ? AppendedJenis(transaksi.jenis) : 'UNKNOWN'}
-                            </span>
-                            <span>{transaksi.items?.length || 0} Macam</span>
-                          </>
+                          <span style={{ backgroundColor: transaksi.jenis === 'Penjualan' ? '#10B981' : transaksi.jenis === 'Pemasukan' ? '#3F51B5' : '#F59E0B', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>{transaksi.jenis?.toUpperCase()}</span>
                         )}
-                      </td>
-                      <td></td><td></td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: isMurniGelap ? '#E0E7FF' : '#1E1B4B', fontSize: '14px' }}>Total: Rp {Number(transaksi.grand_total).toLocaleString('id-ID')}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        {isGrupSedangEdit ? (
-                          <button type="button" onClick={() => simpanEditGrup(tIdx)} style={{ padding: '6px 12px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>💾 Simpan</button>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            <button type="button" onClick={() => mulaiEditGrup(tIdx, transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit</button>
-                            <button type="button" onClick={() => handleHapusGrup(tIdx)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>❌ Hapus</button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>,
-                    ...(transaksi.items || []).map((item, iIdx) => {
-                      const isSedangEdit = editingItemKey === `${tIdx}-${iIdx}`;
-                      return (
-                        <tr key={`item-${tIdx}-${iIdx}`} style={{ borderBottom: `1px solid ${theme.border}`, fontSize: '14px', backgroundColor: theme.bgItemRow, color: theme.textUtama }}>
-                          <td style={{ padding: '12px 14px', color: theme.textMuted, fontSize: '12px', fontStyle: 'italic' }}>↳ detail item</td>
-                          <td style={{ padding: '8px 14px' }}>{isSedangEdit ? <input type="text" value={editBarang} onChange={(e) => setEditBarang(e.target.value)} style={{ width: '90%', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>📦 {item.barang}</span>}</td>
-                          <td style={{ padding: '8px 14px', textAlign: 'center' }}>{isSedangEdit ? <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '50px', textAlign: 'center', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>{item.qty}</span>}</td>
-                          <td style={{ padding: '8px 14px', textAlign: 'right' }}>{isSedangEdit ? <input type="number" value={editHarga} onChange={(e) => setEditHarga(e.target.value)} style={{ width: '90px', textAlign: 'right', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>Rp {Number(item.harga).toLocaleString('id-ID')}</span>}</td>
-                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '700' }}>Rp {Number(item.jumlah).toLocaleString('id-ID')}</td>
-                          <td style={{ padding: '8px 14px', textAlign: 'center' }}>
+                      </div>
+                    </div>
+
+                    {/* Items di dalam Card */}
+                    <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {(transaksi.items || []).map((item, iIdx) => {
+                        const isSedangEdit = editingItemKey === `${tIdx}-${iIdx}`;
+                        return (
+                          <div key={`card-item-${tIdx}-${iIdx}`} style={{ display: 'flex', flexDirection: 'column', paddingBottom: '8px', borderBottom: `1px dashed ${theme.border}`, fontSize: '13px', color: theme.textUtama }}>
                             {isSedangEdit ? (
-                              <button type="button" onClick={() => simpanHasilEdit(tIdx, iIdx)} style={{ padding: '4px 8px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '12px', cursor: 'pointer' }}>💾 Simpan</button>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: theme.bgApp, padding: '8px', borderRadius: '6px' }}>
+                                <input type="text" value={editBarang} onChange={(e) => setEditBarang(e.target.value)} style={{ padding: '6px', borderRadius: '4px', fontSize: '12px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <input type="number" placeholder="Qty" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '60px', padding: '6px', borderRadius: '4px', fontSize: '12px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
+                                  <input type="number" placeholder="Harga" value={editHarga} onChange={(e) => setEditHarga(e.target.value)} style={{ flex: 1, padding: '6px', borderRadius: '4px', fontSize: '12px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
+                                </div>
+                                <button type="button" onClick={() => simpanHasilEdit(tIdx, iIdx)} style={{ padding: '6px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '11px', borderRadius: '4px', border: 'none' }}>💾 Simpan Barang</button>
+                              </div>
                             ) : (
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                <button type="button" onClick={() => mulaiModeEdit(tIdx, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
-                                <button type="button" onClick={() => handleHapusItem(tIdx, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', cursor: 'pointer' }} title="Hapus Barang">🗑️</button>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ flex: 1, paddingRight: '8px' }}>
+                                  <div style={{ fontWeight: '600' }}>📦 {item.barang}</div>
+                                  <div style={{ fontSize: '11px', color: theme.textMuted }}>{item.qty} Pcs x Rp{Number(item.harga).toLocaleString('id-ID')}</div>
+                                </div>
+                                <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ fontWeight: '700' }}>Rp{Number(item.jumlah).toLocaleString('id-ID')}</span>
+                                  <button type="button" onClick={() => mulaiModeEdit(tIdx, iIdx, item)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Edit">✏️</button>
+                                  <button type="button" onClick={() => handleHapusItem(tIdx, iIdx)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Hapus">🗑️</button>
+                                </div>
                               </div>
                             )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ];
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Footer Card (Total & Navigasi Grup) */}
+                    <div style={{ padding: '10px 12px', backgroundColor: theme.bgCard, borderTop: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '800', color: theme.textUtama }}>Total: Rp{Number(transaksi.grand_total).toLocaleString('id-ID')}</span>
+                      <div>
+                        {isGrupSedangEdit ? (
+                          <button type="button" onClick={() => simpanEditGrup(tIdx)} style={{ padding: '4px 10px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>💾 Simpan</button>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button type="button" onClick={() => mulaiEditGrup(tIdx, transaksi)} style={{ padding: '4px 8px', backgroundColor: theme.bgGrupRow, color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>⚙️ Edit</button>
+                            <button type="button" onClick={() => handleHapusGrup(tIdx)} style={{ padding: '4px 8px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>❌ Hapus</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ) : (
+          /* Tampilan Tabel Tradisional (Hanya Aktif Jika di Layar Desktop) */
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <thead>
+                <tr style={{ backgroundColor: theme.thBg, borderBottom: `2px solid ${theme.border}`, color: theme.thText, fontSize: '12px', fontWeight: '800' }}>
+                  <th style={{ padding: '14px', width: '22%' }}>WAKTU / GRUP</th>
+                  <th style={{ padding: '14px', width: '28%' }}>NAMA ITEM / BARANG</th>
+                  <th style={{ padding: '14px', width: '10%', textAlign: 'center' }}>QTY</th>
+                  <th style={{ padding: '14px', width: '15%', textAlign: 'right' }}>HARGA SATUAN</th>
+                  <th style={{ padding: '14px', width: '13%', textAlign: 'right' }}>SUBTOTAL</th>
+                  <th style={{ padding: '14px', width: '12%', textAlign: 'center' }}>AKSI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {daftarTransaksi.length === 0 ? (
+                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: theme.textMuted }}>Belum ada data transaksi.</td></tr>
+                ) : (
+                  daftarTransaksi.map((transaksi, tIdx) => {
+                    const isGrupSedangEdit = editingGroupIdx === tIdx;
+                    return [
+                      <tr key={`grup-${tIdx}`} style={{ backgroundColor: theme.bgGrupRow, borderBottom: `1px solid ${theme.border}`, fontWeight: '700', fontSize: '13px', color: theme.textUtama }}>
+                        <td style={{ padding: '10px 12px' }}>
+                          {isGrupSedangEdit ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <input type="date" value={editTanggal} onChange={(e) => setEditTanggal(e.target.value)} style={{ padding: '6px', fontSize: '12px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} />
+                              <input type="text" value={editJam} placeholder="HH:MM" onChange={(e) => setEditJam(e.target.value)} style={{ padding: '6px', fontSize: '12px', width: '60px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} />
+                            </div>
+                          ) : (<>📅 {transaksi.tanggal} <br/><span style={{ fontSize: '11px', color: theme.textMuted, fontWeight: '500' }}>({transaksi.jam} WIB)</span></>)}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {isGrupSedangEdit ? (
+                            <select value={editJenis} onChange={(e) => setEditJenis(e.target.value)} style={{ padding: '6px', fontWeight: '700', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }}>
+                              <option value="Penjualan">PENJUALAN</option>
+                              <option value="Pengeluaran">PENGELUARAN</option>
+                              <option value="Pemasukan">PEMASUKAN</option>
+                            </select>
+                          ) : (
+                            <>
+                              <span style={{ 
+                                backgroundColor: transaksi.jenis === 'Penjualan' ? '#10B981' : transaksi.jenis === 'Pemasukan' ? '#3F51B5' : '#F59E0B', 
+                                color: '#FFFFFF', 
+                                padding: '3px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '11px', 
+                                marginRight: '10px' 
+                              }}>
+                                {transaksi.jenis ? AppendedJenis(transaksi.jenis) : 'UNKNOWN'}
+                              </span>
+                              <span>{transaksi.items?.length || 0} Macam</span>
+                            </>
+                          )}
+                        </td>
+                        <td></td><td></td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: isMurniGelap ? '#E0E7FF' : '#1E1B4B', fontSize: '14px' }}>Total: Rp {Number(transaksi.grand_total).toLocaleString('id-ID')}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          {isGrupSedangEdit ? (
+                            <button type="button" onClick={() => simpanEditGrup(tIdx)} style={{ padding: '6px 12px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>💾 Simpan</button>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                              <button type="button" onClick={() => mulaiEditGrup(tIdx, transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit</button>
+                              <button type="button" onClick={() => handleHapusGrup(tIdx)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>❌ Hapus</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>,
+                      ...(transaksi.items || []).map((item, iIdx) => {
+                        const isSedangEdit = editingItemKey === `${tIdx}-${iIdx}`;
+                        return (
+                          <tr key={`item-${tIdx}-${iIdx}`} style={{ borderBottom: `1px solid ${theme.border}`, fontSize: '14px', backgroundColor: theme.bgItemRow, color: theme.textUtama }}>
+                            <td style={{ padding: '12px 14px', color: theme.textMuted, fontSize: '12px', fontStyle: 'italic' }}>↳ detail item</td>
+                            <td style={{ padding: '8px 14px' }}>{isSedangEdit ? <input type="text" value={editBarang} onChange={(e) => setEditBarang(e.target.value)} style={{ width: '90%', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>📦 {item.barang}</span>}</td>
+                            <td style={{ padding: '8px 14px', textAlign: 'center' }}>{isSedangEdit ? <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '50px', textAlign: 'center', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>{item.qty}</span>}</td>
+                            <td style={{ padding: '8px 14px', textAlign: 'right' }}>{isSedangEdit ? <input type="number" value={editHarga} onChange={(e) => setEditHarga(e.target.value)} style={{ width: '90px', textAlign: 'right', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>Rp {Number(item.harga).toLocaleString('id-ID')}</span>}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '700' }}>Rp {Number(item.jumlah).toLocaleString('id-ID')}</td>
+                            <td style={{ padding: '8px 14px', textAlign: 'center' }}>
+                              {isSedangEdit ? (
+                                <button type="button" onClick={() => simpanHasilEdit(tIdx, iIdx)} style={{ padding: '4px 8px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '12px', cursor: 'pointer' }}>💾 Simpan</button>
+                              ) : (
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  <button type="button" onClick={() => mulaiModeEdit(tIdx, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
+                                  <button type="button" onClick={() => handleHapusItem(tIdx, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', cursor: 'pointer' }} title="Hapus Barang">🗑️</button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ];
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
     </div>
