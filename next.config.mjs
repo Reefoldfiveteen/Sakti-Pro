@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-   output: 'export', /* config options here */
+  /* Hapus atau komentari jika ada baris output: 'export' */
 };
 
-export default nextConfig;
+module.exports = nextConfig;
