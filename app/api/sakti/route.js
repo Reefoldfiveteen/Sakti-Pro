@@ -11,7 +11,8 @@ export async function POST(request) {
 
     const sekarang = new Date();
     const tanggalInput = sekarang.toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' }); 
-    const jamInput = grandma = sekarang.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' }).replace(/\./g, ':');
+    // 🌟 SEKARANG SUDAH BERSIH DAN BENAR (TIDAK ADA GRANDMA):
+    const jamInput = sekarang.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' }).replace(/\./g, ':');
 
     // =================================================================
     // 🌟 STRATEGI ANTREAN ROTASI BERDASARKAN RATE LIMIT AKTUAL AKUN ARIF
