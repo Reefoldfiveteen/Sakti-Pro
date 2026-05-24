@@ -1,0 +1,61 @@
+
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          table { border-collapse: collapse; font-family: sans-serif; }
+          th { background-color: #F1F5F9; border: 1px solid #CBD5E1; color: #334155; font-weight: bold; text-align: left; padding: 10px; }
+          td { border: 1px solid #E2E8F0; padding: 8px; }
+          .row-grup { background-color: #E2E8F0; font-weight: bold; }
+          .badge-penjualan { background-color: #10B981; color: #ffffff; padding: 4px 8px; font-weight: bold; text-align: center; }
+          .badge-pengeluaran { background-color: #F59E0B; color: #ffffff; padding: 4px 8px; font-weight: bold; text-align: center; }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          .subtotal { font-weight: bold; color: #0F172A; }
+          .detail-label { color: #94A3B8; font-style: italic; }
+        </style>
+      </head>
+      <body>
+        <h2>📋 LAPORAN REKAPITULASI TRANSAKSI DETAIL - SAKTI PRO</h2>
+        <br/>
+        <table>
+          <thead>
+            <tr>
+              <th>WAKTU / GRUP</th>
+              <th>NAMA ITEM / BARANG</th>
+              <th class="text-center">QTY</th>
+              <th class="text-right">HARGA SATUAN</th>
+              <th class="text-right">SUBTOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+    
+        <tr class="row-grup">
+          <td>📅 2026-05-22 (05:07 WIB)</td>
+          <td><span class="badge-penjualan">PENJUALAN</span> — 2 Barang</td>
+          <td></td>
+          <td></td>
+          <td class="text-right">Total: Rp 29.000</td>
+        </tr>
+      
+          <tr>
+            <td class="detail-label">↳ detail item</td>
+            <td style="font-weight: 600;">📦 bakso</td>
+            <td class="text-center">2</td>
+            <td class="text-right">Rp 10.000</td>
+            <td class="text-right subtotal">Rp 20.000</td>
+          </tr>
+        
+          <tr>
+            <td class="detail-label">↳ detail item</td>
+            <td style="font-weight: 600;">📦 es teh</td>
+            <td class="text-center">3</td>
+            <td class="text-right">Rp 3.000</td>
+            <td class="text-right subtotal">Rp 9.000</td>
+          </tr>
+        
+          </tbody>
+        </table>
+      </body>
+      </html>
+    

@@ -9,6 +9,9 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+node_modules
+.next
+out
 
 # testing
 /coverage
@@ -39,3 +42,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
