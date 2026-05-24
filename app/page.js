@@ -765,7 +765,16 @@ export default function Home() {
           <label htmlFor="upload-nota" style={{ display: 'block', textAlign: 'center', padding: '16px', borderRadius: '8px', backgroundColor: isLoading ? '#94A3B8' : '#10B981', color: '#FFFFFF', fontWeight: '700', cursor: 'pointer' }}>
             {isLoading ? '⏳ Sedang memproses...' : '📂 Pilih / Foto Nota Belanja'}
           </label>
-          <input id="upload-nota" type="file" accept="image/*" onChange={handleUploadFoto} disabled={isLoading} style={{ display: 'none' }} />
+          {/* 🌟 UPGRADE INPUT: OTOMATIS POP-UP KAMERA DI HP & TETAP OPEN FILE DI LAPTOP */}
+          <input 
+            id="upload-nota" 
+            type="file" 
+            accept="image/*" 
+            capture={isMobile ? "environment" : undefined} // Jika di HP, langsung pemicu kamera belakang
+            onChange={handleUploadFoto} 
+            disabled={isLoading} 
+            style={{ display: 'none' }} 
+          />
         </div>
       </div>
 
