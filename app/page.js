@@ -147,7 +147,6 @@ export default function Home() {
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 3);
 
-    // Profit Bersih bertambah dari Omzet & Pemasukan Non-Jualan, dikurangi Pengeluaran
     const untungBersih = (omzet + pemasukanLain) - pengeluaran;
     const totalTransaksiCount = omzet + pengeluaran + pemasukanLain;
     const persenJual = totalTransaksiCount > 0 ? Math.round(((omzet + pemasukanLain) / totalTransaksiCount) * 100) : 50;
@@ -416,6 +415,33 @@ export default function Home() {
     setEditingGroupIdx(null); 
   };
 
+  // 🌟 1. LOGIKA BARU: ENGINE PENGHAPUSAN TRANSASKI INDIVIDUAL/GRUP & DETAIL BARANG
+  const handleHapusGrup = (tIdx) => {
+    if (confirm("Apakah Anda yakin ingin menghapus seluruh grup transaksi ini beserta item di dalamnya?")) {
+      const dataBaru = daftarTransaksi.filter((_, idx) => idx !== tIdx);
+      simpanKeMemoriLokal(dataBaru);
+    }
+  };
+
+  const handleHapusItem = (tIdx, iIdx) => {
+    if (confirm("Hapus item barang ini dari detail rekapitulasi transaksi?")) {
+      const dataBaru = [...daftarTransaksi];
+      
+      // Filter out item yang dipilih
+      dataBaru[tIdx].items = dataBaru[tIdx].items.filter((_, idx) => idx !== iIdx);
+      
+      // Jika sehabis dihapus ternyata list itemnya jadi kosong murni, langsung tendang sekalian grup transaksinya
+      if (dataBaru[tIdx].items.length === 0) {
+        dataBaru.splice(tIdx, 1);
+      } else {
+        // Jika masih sisa item lain, kalkulasi ulang grand_total untuk grup tIdx ini
+        dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
+      }
+      
+      simpanKeMemoriLokal(dataBaru);
+    }
+  };
+
   const handleHapusSemuaData = () => {
     if (confirm("Apakah Anda yakin ingin mengosongkan seluruh isi tabel rekap?")) {
       simpanKeMemoriLokal([]);
@@ -431,11 +457,9 @@ export default function Home() {
       const ExcelJS = require('exceljs');
       const saveAs = require('file-saver');
 
-      // 1. Inisialisasi Buku Kerja & Lembar Kerja Excel Baru
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Rekap SAKTI UMKM');
 
-      // 2. Susun Baris Konten Data Mentah
       const barisData = [];
       barisData.push(["LAPORAN KEUANGAN KASIR UMKM — SAKTI PRO ENTERPRISE"]);
       barisData.push([`Tanggal Cetak Dokumen: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`]);
@@ -490,21 +514,12 @@ export default function Home() {
         }
       });
 
-      // Inject baris data ke dalam worksheet
       worksheet.addRows(barisData);
 
-      // 3. Atur Lebar Kolom Biar Teks Tidak Terpotong
       worksheet.columns = [
-        { width: 32 }, // Kolom A
-        { width: 30 }, // Kolom B
-        { width: 18 }, // Kolom C
-        { width: 20 }, // Kolom D
-        { width: 25 }, // Kolom E
-        { width: 24 }, // Kolom F (Label Grafik)
-        { width: 35 }  // Kolom G (Visualisasi Grafik Batang REPT)
+        { width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }
       ];
 
-      // Format Angka Rupiah untuk Sel Nilai Nominal (B6, B7, B8)
       ['B6', 'B7', 'B8'].forEach(cellRef => {
         const cell = worksheet.getCell(cellRef);
         if (cell.value !== undefined) {
@@ -512,33 +527,23 @@ export default function Home() {
         }
       });
 
-      // =================================================================
-      // 📊 INJEKSI GRAFIK FORMULA NATIVE EXCEL (100% DINAMIS & INTERAKTIF)
-      // =================================================================
-      
-      // A. Header Area Grafik di F4
       worksheet.getCell('F4').value = "📊 VISUALISASI CASHFLOW RATIO (DINAMIS)";
       worksheet.getCell('F4').font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
 
-      // B. Bar Proporsi Penjualan / Omzet (Baris 6)
       worksheet.getCell('F6').value = "🟢 Penjualan (Omzet) :";
       worksheet.getCell('F6').font = { fontWeight: '600' };
-      // Rumus Excel: Menghitung persentase B6 terhadap total (B6+B7), lalu mencetak karakter blok '█' sebanyak persentasenya
       worksheet.getCell('G6').value = { 
         formula: '=IF((B6+B7)>0, REPT("█", ROUND((B6/(B6+B7))*25, 0)) & " " & TEXT(B6/(B6+B7), "0%"), "0%")' 
       };
-      worksheet.getCell('G6').font = { color: { argb: 'FF10B981' }, bold: true }; // Warna Hijau Mint
+      worksheet.getCell('G6').font = { color: { argb: 'FF10B981' }, bold: true };
 
-      // C. Bar Proporsi Pengeluaran / Biaya (Baris 7)
       worksheet.getCell('F7').value = "🔴 Pengeluaran (Biaya) :";
       worksheet.getCell('F7').font = { fontWeight: '600' };
-      // Rumus Excel: Menghitung persentase B7 terhadap total (B6+B7), lalu mencetak karakter blok '█'
       worksheet.getCell('G7').value = { 
         formula: '=IF((B6+B7)>0, REPT("█", ROUND((B7/(B6+B7))*25, 0)) & " " & TEXT(B7/(B6+B7), "0%"), "0%")' 
       };
-      worksheet.getCell('G7').font = { color: { argb: 'FFEF4444' }, bold: true }; // Warna Merah
+      worksheet.getCell('G7').font = { color: { argb: 'FFEF4444' }, bold: true };
 
-      // 5. Proses Kompilasi Buffering & Unduh Berkas `.xlsx`
       const buffer = await workbook.xlsx.writeBuffer();
       const fileDate = new Date().toISOString().split('T')[0];
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -557,7 +562,6 @@ export default function Home() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '35px', flexWrap: 'wrap', gap: '15px' }}>
         <div style={{ flex: 1 }}>
           <div style={{ marginBottom: '2px', marginLeft: '-15px' }}>
-            {/* Memanggil komponen Logo yang sudah berisi teks POS Toko UMKM bawaanmu */}
             <LogoSakti id="LogoUtamaSakti" isDark={isMurniGelap} />
           </div>
           <p style={{ color: theme.textMuted, marginTop: '-5px', marginLeft: '15px', margin: '0', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px', fontStyle: 'italic' }}>
@@ -750,11 +754,10 @@ export default function Home() {
                           <select value={editJenis} onChange={(e) => setEditJenis(e.target.value)} style={{ padding: '6px', fontWeight: '700', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }}>
                             <option value="Penjualan">PENJUALAN</option>
                             <option value="Pengeluaran">PENGELUARAN</option>
-                            <option value="Pemasukan">PEMASUKAN</option> {/* 🌟 MENAMBAHKAN OPSI EDIT PEMASUKAN */}
+                            <option value="Pemasukan">PEMASUKAN</option>
                           </select>
                         ) : (
                           <>
-                            {/* 🌟 CUSTOM BADGE COLOR BERDASARKAN JENIS BARU */}
                             <span style={{ 
                               backgroundColor: transaksi.jenis === 'Penjualan' ? '#10B981' : transaksi.jenis === 'Pemasukan' ? '#3F51B5' : '#F59E0B', 
                               color: '#FFFFFF', 
@@ -775,7 +778,10 @@ export default function Home() {
                         {isGrupSedangEdit ? (
                           <button type="button" onClick={() => simpanEditGrup(tIdx)} style={{ padding: '6px 12px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>💾 Simpan</button>
                         ) : (
-                          <button type="button" onClick={() => mulaiEditGrup(tIdx, transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit Grup</button>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button type="button" onClick={() => mulaiEditGrup(tIdx, transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit</button>
+                            <button type="button" onClick={() => handleHapusGrup(tIdx)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>❌ Hapus</button>
+                          </div>
                         )}
                       </td>
                     </tr>,
@@ -792,7 +798,10 @@ export default function Home() {
                             {isSedangEdit ? (
                               <button type="button" onClick={() => simpanHasilEdit(tIdx, iIdx)} style={{ padding: '4px 8px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '12px', cursor: 'pointer' }}>💾 Simpan</button>
                             ) : (
-                              <button type="button" onClick={() => mulaiModeEdit(tIdx, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                <button type="button" onClick={() => mulaiModeEdit(tIdx, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
+                                <button type="button" onClick={() => handleHapusItem(tIdx, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', cursor: 'pointer' }} title="Hapus Barang">🗑️</button>
+                              </div>
                             )}
                           </td>
                         </tr>
