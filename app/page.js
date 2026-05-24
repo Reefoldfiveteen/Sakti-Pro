@@ -117,10 +117,11 @@ export default function Home() {
     thText: isMurniGelap ? '#CBD5E1' : '#334155',
   };
 
-  // ENGINE ANALISIS DATA DASBOR UMKM (REAL-TIME COMPUTATION)
+  // ENGINE ANALISIS DATA DASBOR UMKM (REAL-TIME COMPUTATION) WITH PEMASUKAN SUPPORT
   const hitungMetrikUMKM = () => {
     let omzet = 0;
     let pengeluaran = 0;
+    let pemasukanLain = 0;
     const petaProduk = {};
 
     daftarTransaksi.forEach((t) => {
@@ -136,6 +137,8 @@ export default function Home() {
         }
       } else if (t.jenis === 'Pengeluaran') {
         pengeluaran += totalGrup;
+      } else if (t.jenis === 'Pemasukan') {
+        pemasukanLain += totalGrup;
       }
     });
 
@@ -144,9 +147,10 @@ export default function Home() {
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 3);
 
-    const untungBersih = omzet - pengeluaran;
-    const totalTransaksiCount = omzet + pengeluaran;
-    const persenJual = totalTransaksiCount > 0 ? Math.round((omzet / totalTransaksiCount) * 100) : 50;
+    // Profit Bersih bertambah dari Omzet & Pemasukan Non-Jualan, dikurangi Pengeluaran
+    const untungBersih = (omzet + pemasukanLain) - pengeluaran;
+    const totalTransaksiCount = omzet + pengeluaran + pemasukanLain;
+    const persenJual = totalTransaksiCount > 0 ? Math.round(((omzet + pemasukanLain) / totalTransaksiCount) * 100) : 50;
 
     return { omzet, pengeluaran, untungBersih, produkTerlaris, persenJual };
   };
@@ -554,7 +558,7 @@ export default function Home() {
         <div style={{ flex: 1 }}>
           <div style={{ marginBottom: '2px', marginLeft: '-15px' }}>
             {/* Memanggil komponen Logo yang sudah berisi teks POS Toko UMKM bawaanmu */}
-            <LogoSakti isDark={isMurniGelap} />
+            <LogoSakti id="LogoUtamaSakti" isDark={isMurniGelap} />
           </div>
           <p style={{ color: theme.textMuted, marginTop: '-5px', marginLeft: '15px', margin: '0', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px', fontStyle: 'italic' }}>
             "Dikte Transaksinya, Amankan Keuangannya, Kuasai Pasarnya."
@@ -618,8 +622,8 @@ export default function Home() {
               <span style={{ fontSize: '14px', fontWeight: '800', color: theme.textUtama }}>{metrik.persenJual}%</span>
             </div>
             <div style={{ fontSize: '13px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Penjualan (Omzet)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Pengeluaran (Biaya)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Masuk (Omzet/Suntikan)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Keluar (Biaya/Operasional)</div>
             </div>
           </div>
         </div>
@@ -746,10 +750,21 @@ export default function Home() {
                           <select value={editJenis} onChange={(e) => setEditJenis(e.target.value)} style={{ padding: '6px', fontWeight: '700', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }}>
                             <option value="Penjualan">PENJUALAN</option>
                             <option value="Pengeluaran">PENGELUARAN</option>
+                            <option value="Pemasukan">PEMASUKAN</option> {/* 🌟 MENAMBAHKAN OPSI EDIT PEMASUKAN */}
                           </select>
                         ) : (
                           <>
-                            <span style={{ backgroundColor: transaksi.jenis === 'Penjualan' ? '#10B981' : '#F59E0B', color: '#FFFFFF', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', marginRight: '10px' }}>{transaksi.jenis.toUpperCase()}</span>
+                            {/* 🌟 CUSTOM BADGE COLOR BERDASARKAN JENIS BARU */}
+                            <span style={{ 
+                              backgroundColor: transaksi.jenis === 'Penjualan' ? '#10B981' : transaksi.jenis === 'Pemasukan' ? '#3F51B5' : '#F59E0B', 
+                              color: '#FFFFFF', 
+                              padding: '3px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '11px', 
+                              marginRight: '10px' 
+                            }}>
+                              {transaksi.jenis ? transaksi.jenis.toUpperCase() : 'UNKNOWN'}
+                            </span>
                             <span>{transaksi.items?.length || 0} Macam</span>
                           </>
                         )}

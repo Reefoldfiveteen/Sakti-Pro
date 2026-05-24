@@ -11,7 +11,7 @@ export async function POST(request) {
 
     const sekarang = new Date();
     const tanggalInput = sekarang.toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' }); 
-    const jamInput = sekarang.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' }).replace(/\./g, ':');
+    const jamInput = grandma = sekarang.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' }).replace(/\./g, ':');
 
     // =================================================================
     // 🌟 STRATEGI ANTREAN ROTASI BERDASARKAN RATE LIMIT AKTUAL AKUN ARIF
@@ -23,14 +23,14 @@ export async function POST(request) {
         "gemini-2.5-flash-native-audio-latest", 
         "gemini-3.5-flash",                      
         "gemini-3-flash-preview",                
-        "gemini-2.5-flash"                       
+        "gemini-2.5-flash"                        
       ];
     } else if (tipe === 'foto') {
       antreanModel = [
         "gemini-3.5-flash",                      
         "gemini-3-flash-preview",                
         "gemini-3.1-flash-lite",                 
-        "gemini-2.5-flash"                       
+        "gemini-2.5-flash"                        
       ];
     } else {
       antreanModel = [
@@ -51,13 +51,16 @@ export async function POST(request) {
         contents: [{
           parts: [{
             text: `Kamu adalah kasir akuntan pintar UMKM Indonesia. Analisis kalimat transaksi berikut: "${dataInput}"
-            Tentukan secara cerdas klasifikasi jenis transaksinya (Penjualan atau Pengeluaran).
+            Tentukan secara cerdas klasifikasi jenis transaksinya (Penjualan, Pengeluaran, atau Pemasukan).
+            * Penjualan: Jika ada aktivitas penjualan produk/barang toko ke pembeli.
+            * Pengeluaran: Jika ada aktivitas belanja modal, kulakan, biaya operasional, atau bayar tagihan.
+            * Pemasukan: Jika ada dana masuk di luar penjualan produk, seperti modal awal, piutang cair, atau investasi.
             
             FORMAT OUTPUT WAJIB (HANYA JSON OBJECT, TANPA MARKDOWN):
             {
               "tanggal": "${tanggalInput}",
               "jam": "${jamInput}",
-              "jenis": "Penjualan atau Pengeluaran", 
+              "jenis": "Penjualan, Pengeluaran, atau Pemasukan", 
               "items": [
                 { "barang": "Nama barang asli", "qty": (angka), "harga": (angka), "jumlah": (qty dikali harga) }
               ],
@@ -77,13 +80,16 @@ export async function POST(request) {
           parts: [
             {
               text: `Kamu adalah akuntan POS AI tingkat tinggi. Analisis berkas ${konteksMedia} ini secara murni dan teliti.
-              Tentukan jenis transaksi secara otomatis (Penjualan jika laku/jual, Pengeluaran jika beli/nota belanja).
+              Tentukan jenis transaksi secara otomatis:
+              * Penjualan: Jika ada aktivitas penjualan produk/barang toko ke pembeli (laku/jual).
+              * Pengeluaran: Jika ada aktivitas belanja modal, kulakan, biaya operasional, atau beli/nota belanja.
+              * Pemasukan: Jika ada dana masuk di luar penjualan produk, seperti modal awal, piutang cair, atau investasi tambahan.
               
               FORMAT OUTPUT WAJIB (HANYA JSON OBJECT, TANPA MARKDOWN):
               {
                 "tanggal": "${tanggalInput}",
                 "jam": "${jamInput}",
-                "jenis": "Penjualan atau Pengeluaran",
+                "jenis": "Penjualan, Pengeluaran, atau Pemasukan",
                 "items": [
                   { "barang": "Nama barang", "qty": (angka), "harga": (angka), "jumlah": (subtotal item) }
                 ],
