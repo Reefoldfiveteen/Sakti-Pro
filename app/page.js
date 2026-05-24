@@ -117,7 +117,7 @@ export default function Home() {
     thText: isMurniGelap ? '#CBD5E1' : '#334155',
   };
 
-  // ENGINE ANALISIS DATA DASBOR UMKM (REAL-TIME COMPUTATION) WITH PEMASUKAN SUPPORT
+  // ENGINE ANALISIS DATA DASBOR UMKM (REAL-TIME COMPUTATION)
   const hitungMetrikUMKM = () => {
     let omzet = 0;
     let pengeluaran = 0;
@@ -149,9 +149,13 @@ export default function Home() {
 
     const untungBersih = (omzet + pemasukanLain) - pengeluaran;
     const totalTransaksiCount = omzet + pengeluaran + pemasukanLain;
-    const persenJual = totalTransaksiCount > 0 ? Math.round(((omzet + pemasukanLain) / totalTransaksiCount) * 100) : 50;
 
-    return { omzet, pengeluaran, untungBersih, produkTerlaris, persenJual };
+    // 🌟 SEGMEN PERSENTASE BARU UNTUK GRAFIK TIGA DIMENSI/ARAH (WEB PIE CHART)
+    const persenJual = totalTransaksiCount > 0 ? Math.round((omzet / totalTransaksiCount) * 100) : 0;
+    const persenKeluar = totalTransaksiCount > 0 ? Math.round((pengeluaran / totalTransaksiCount) * 100) : 0;
+    const persenMasuk = totalTransaksiCount > 0 ? Math.round((pemasukanLain / totalTransaksiCount) * 100) : 0;
+
+    return { omzet, pengeluaran, pemasukanLain, untungBersih, produkTerlaris, persenJual, persenKeluar, persenMasuk, totalTransaksiCount };
   };
 
   const metrik = hitungMetrikUMKM();
@@ -415,7 +419,6 @@ export default function Home() {
     setEditingGroupIdx(null); 
   };
 
-  // 🌟 1. LOGIKA BARU: ENGINE PENGHAPUSAN TRANSASKI INDIVIDUAL/GRUP & DETAIL BARANG
   const handleHapusGrup = (tIdx) => {
     if (confirm("Apakah Anda yakin ingin menghapus seluruh grup transaksi ini beserta item di dalamnya?")) {
       const dataBaru = daftarTransaksi.filter((_, idx) => idx !== tIdx);
@@ -426,18 +429,13 @@ export default function Home() {
   const handleHapusItem = (tIdx, iIdx) => {
     if (confirm("Hapus item barang ini dari detail rekapitulasi transaksi?")) {
       const dataBaru = [...daftarTransaksi];
-      
-      // Filter out item yang dipilih
       dataBaru[tIdx].items = dataBaru[tIdx].items.filter((_, idx) => idx !== iIdx);
       
-      // Jika sehabis dihapus ternyata list itemnya jadi kosong murni, langsung tendang sekalian grup transaksinya
       if (dataBaru[tIdx].items.length === 0) {
         dataBaru.splice(tIdx, 1);
       } else {
-        // Jika masih sisa item lain, kalkulasi ulang grand_total untuk grup tIdx ini
         dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
       }
-      
       simpanKeMemoriLokal(dataBaru);
     }
   };
@@ -469,6 +467,7 @@ export default function Home() {
       barisData.push(["Metrik Keuangan", "Nilai Nominal", "Status Evaluasi Bisnis"]);
       barisData.push(["💰 Total Omzet Penjualan", metrik.omzet, "Pendapatan Kotor Toko"]);
       barisData.push(["💸 Total Biaya / Pengeluaran", metrik.pengeluaran, "Biaya Operasional & Kulakan"]);
+      barisData.push(["💎 Total Pemasukan Tambahan", metrik.pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); // 🌟 INJEKSI BARIS PEMASUKAN BARU DI B8
       barisData.push([
         "📈 Profit Bersih Toko", 
         metrik.untungBersih, 
@@ -520,29 +519,40 @@ export default function Home() {
         { width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }
       ];
 
-      ['B6', 'B7', 'B8'].forEach(cellRef => {
+      // Format Rupiah diperlebar sampai baris B9 karena ada baris pemasukan baru
+      ['B6', 'B7', 'B8', 'B9'].forEach(cellRef => {
         const cell = worksheet.getCell(cellRef);
         if (cell.value !== undefined) {
           cell.numFormat = '#,##0';
         }
       });
 
-      worksheet.getCell('F4').value = "📊 VISUALISASI CASHFLOW RATIO (DINAMIS)";
+      // =================================================================
+      // 📊 UPGRADE RUMUS EXCEL NATIVE 3 ARAH (PENJUALAN, OPERASIONAL, SUNTIKAN MODAL)
+      // =================================================================
+      worksheet.getCell('F4').value = "📊 VISUALISASI CASHFLOW RATIO (DINAMIS TIGA SEGMEN)";
       worksheet.getCell('F4').font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
 
       worksheet.getCell('F6').value = "🟢 Penjualan (Omzet) :";
       worksheet.getCell('F6').font = { fontWeight: '600' };
       worksheet.getCell('G6').value = { 
-        formula: '=IF((B6+B7)>0, REPT("█", ROUND((B6/(B6+B7))*25, 0)) & " " & TEXT(B6/(B6+B7), "0%"), "0%")' 
+        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B6/(B6+B7+B8))*25, 0)) & " " & TEXT(B6/(B6+B7+B8), "0%"), "0%")' 
       };
       worksheet.getCell('G6').font = { color: { argb: 'FF10B981' }, bold: true };
 
       worksheet.getCell('F7').value = "🔴 Pengeluaran (Biaya) :";
       worksheet.getCell('F7').font = { fontWeight: '600' };
       worksheet.getCell('G7').value = { 
-        formula: '=IF((B6+B7)>0, REPT("█", ROUND((B7/(B6+B7))*25, 0)) & " " & TEXT(B7/(B6+B7), "0%"), "0%")' 
+        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B7/(B6+B7+B8))*25, 0)) & " " & TEXT(B7/(B6+B7+B8), "0%"), "0%")' 
       };
       worksheet.getCell('G7').font = { color: { argb: 'FFEF4444' }, bold: true };
+
+      worksheet.getCell('F8').value = "🔵 Pemasukan (Suntikan Modal) :";
+      worksheet.getCell('F8').font = { fontWeight: '600' };
+      worksheet.getCell('G8').value = { 
+        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B8/(B6+B7+B8))*25, 0)) & " " & TEXT(B8/(B6+B7+B8), "0%"), "0%")' 
+      };
+      worksheet.getCell('G8').font = { color: { argb: 'FF3F51B5' }, bold: true };
 
       const buffer = await workbook.xlsx.writeBuffer();
       const fileDate = new Date().toISOString().split('T')[0];
@@ -554,6 +564,11 @@ export default function Home() {
       alert("Terjadi kesalahan teknis saat memproses laporan Excel.");
     }
   };
+
+  // Perhitungan derajat keliling conic-gradient lingkaran (Pie Segmen)
+  const degJual = metrik.totalTransaksiCount > 0 ? (metrik.omzet / metrik.totalTransaksiCount) * 360 : 120;
+  const degKeluar = metrik.totalTransaksiCount > 0 ? (metrik.pengeluaran / metrik.totalTransaksiCount) * 360 : 120;
+  const gradienPieDinamis = `conic-gradient(#10B981 0deg ${degJual}deg, #EF4444 ${degJual}deg ${degJual + degKeluar}deg, #3F51B5 ${degJual + degKeluar}deg 360deg)`;
 
   return (
     <div style={{ maxWidth: '1150px', margin: '40px auto', padding: '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: theme.bgApp, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
@@ -581,18 +596,23 @@ export default function Home() {
 
 
       {/* MANAGEMENT PANEL KARTU METRIK UTAMA TOKO */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '25px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: isMurniGelap ? '#065F46' : '#E6F4EA', padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <span style={{ fontSize: '12px', fontWeight: '700', color: isMurniGelap ? '#A7F3D0' : '#137333', textTransform: 'uppercase' }}>💰 Total Omzet Penjualan</span>
-          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: '24px', fontWeight: '800' }}>Rp {metrik.omzet.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: '22px', fontWeight: '800' }}>Rp {metrik.omzet.toLocaleString('id-ID')}</h2>
         </div>
         <div style={{ backgroundColor: isMurniGelap ? '#991B1B' : '#FCE8E6', padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: isMurniGelap ? '#FCA5A5' : '#C5221F', textTransform: 'uppercase' }}>💸 Total Biaya Kulakan/Pengeluaran</span>
-          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: '24px', fontWeight: '800' }}>Rp {metrik.pengeluaran.toLocaleString('id-ID')}</h2>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: isMurniGelap ? '#FCA5A5' : '#C5221F', textTransform: 'uppercase' }}>💸 Total Biaya / Pengeluaran</span>
+          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: '22px', fontWeight: '800' }}>Rp {metrik.pengeluaran.toLocaleString('id-ID')}</h2>
         </div>
-        <div style={{ backgroundColor: metrik.untungBersih >= 0 ? (isMurniGelap ? '#1E1B4B' : '#E8EAF6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: metrik.untungBersih >= 0 ? '#3F51B5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
-          <h2 style={{ margin: '8px 0 0 0', color: theme.textUtama, fontSize: '24px', fontWeight: '800' }}>Rp {metrik.untungBersih.toLocaleString('id-ID')}</h2>
+        {/* 🌟 PENAMBAHAN KARTU INDIKATOR MODAL / PEMASUKAN BARU DI DASHBOARD UTAMA */}
+        <div style={{ backgroundColor: isMurniGelap ? '#1E3A8A' : '#E0E7FF', padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: isMurniGelap ? '#93C5FD' : '#3730A3', textTransform: 'uppercase' }}>💎 Suntikan / Pemasukan Lain</span>
+          <h2 style={{ margin: '8px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: '22px', fontWeight: '800' }}>Rp {metrik.pemasukanLain.toLocaleString('id-ID')}</h2>
+        </div>
+        <div style={{ backgroundColor: metrik.untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: metrik.untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
+          <h2 style={{ margin: '8px 0 0 0', color: theme.textUtama, fontSize: '22px', fontWeight: '800' }}>Rp {metrik.untungBersih.toLocaleString('id-ID')}</h2>
         </div>
       </div>
 
@@ -620,14 +640,17 @@ export default function Home() {
         </div>
 
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO)</h4>
+          <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: `conic-gradient(#10B981 0% ${metrik.persenJual}%, #EF4444 ${metrik.persenJual}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard }}>
-              <span style={{ fontSize: '14px', fontWeight: '800', color: theme.textUtama }}>{metrik.persenJual}%</span>
+            {/* 🌟 UPGRADE LINGKARAN CONIC GRADIENT MENGGUNAKAN INDIKATOR WARNA BARU (HIJAU, MERAH, BIRU) */}
+            <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: gradienPieDinamis, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard }}>
+              <span style={{ fontSize: '12px', ...
+              fontWeight: '800', color: theme.textUtama }}>{metrik.totalTransaksiCount > 0 ? 'Aktif' : '0%'}</span>
             </div>
-            <div style={{ fontSize: '13px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Masuk (Omzet/Suntikan)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Keluar (Biaya/Operasional)</div>
+            <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({metrik.persenJual}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({metrik.persenKeluar}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({metrik.persenMasuk}%)</div>
             </div>
           </div>
         </div>
@@ -766,7 +789,7 @@ export default function Home() {
                               fontSize: '11px', 
                               marginRight: '10px' 
                             }}>
-                              {transaksi.jenis ? transaksi.jenis.toUpperCase() : 'UNKNOWN'}
+                              {transaksi.jenis ? AppendedJenis(transaksi.jenis) : 'UNKNOWN'}
                             </span>
                             <span>{transaksi.items?.length || 0} Macam</span>
                           </>
@@ -817,4 +840,8 @@ export default function Home() {
 
     </div>
   );
+}
+
+function AppendedJenis(val) {
+  return String(val).toUpperCase();
 }
