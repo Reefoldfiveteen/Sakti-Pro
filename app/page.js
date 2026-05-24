@@ -53,6 +53,35 @@ export default function Home() {
   const audioChunksRef = useRef([]);
   const autoSyncTimerRef = useRef(null);
 
+  // 🌟 JEMBATAN AKUN (JAVASCRIPT BRIDGE) UNTUK LOGIN AUTOMATIS NATIVE PERANGKAT ANDROID
+  useEffect(() => {
+    window.terimaTokenDariAndroid = async (idToken) => {
+      if (!idToken) {
+        setErrorPesan("Gagal menerima kredensial login dari perangkat Android.");
+        return;
+      }
+      setIsSyncing(true);
+      setErrorPesan('');
+      try {
+        console.log("[SAKTI Bridge] Token Akun Native Android Berhasil Dikunci!");
+        localStorage.setItem('sakti_token_gdrive', idToken);
+        setIsLoggedInGDrive(true);
+        await ambilDataDariDrive(idToken);
+      } catch (err) {
+        console.error("Error pemrosesan token jembatan Android:", err);
+        setErrorPesan("Jembatan otentikasi perangkat gagal merespon.");
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.terimaTokenDariAndroid;
+      }
+    };
+  }, [daftarTransaksi]);
+
   // Ambil data riwayat lama dari memori lokal komputer saat aplikasi pertama dibuka
   useEffect(() => {
     const dataLokal = localStorage.getItem('sakti_riwayat_data');
@@ -678,8 +707,19 @@ export default function Home() {
             </div>
           )}
 
+          {/* 🌟 PENYESUAIAN LOGIN: INTERFACE DETEKTOR JEMBATAN AKUN JAVASCRIPT ANDROID */}
           {!isLoggedInGDrive ? (
-            <button onClick={handleLoginGDrive} disabled={isSyncing} style={{ width: isMobile ? '100%' : 'auto', padding: '10px 18px', backgroundColor: '#2563EB', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
+            <button 
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.AndroidJSInterface) {
+                  window.AndroidJSInterface.pemicuLoginNativeGoogle();
+                } else {
+                  handleLoginGDrive();
+                }
+              }} 
+              disabled={isSyncing} 
+              style={{ width: isMobile ? '100%' : 'auto', padding: '10px 18px', backgroundColor: '#2563EB', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+            >
               {isSyncing ? '🔄 Menghubungkan...' : '🔗 Hubungkan Google Drive'}
             </button>
           ) : (
@@ -701,7 +741,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* CONTROL INTERFACE (🌟 REFRESH GRID MENJADI RESPONSIF) */}
+      {/* CONTROL INTERFACE */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr', gap: '24px', marginBottom: '40px' }}>
         <div style={{ border: `1px solid ${theme.border}`, padding: isMobile ? '16px' : '24px', borderRadius: '16px', backgroundColor: theme.bgCard, opacity: isLoading ? 0.6 : 1 }}>
           <label style={{ display: 'block', fontWeight: '700', color: theme.textUtama, fontSize: '13px', marginBottom: '14px' }}>🎙️ AUDIO WORKSTATION (KENDALI MANUAL TOTAL)</label>
@@ -746,7 +786,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 🌟 STRATEGI SWITCH INTERFACE REKAP: RUNNER CARD-LIST UNTUK LAYAR MOBILE MOBILE ACCESSIBILITY */}
+        {/* INTERFACE RESPONSIVE CHECK SYSTEM */}
         {isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
             {daftarTransaksi.length === 0 ? (
@@ -814,7 +854,7 @@ export default function Home() {
                       })}
                     </div>
 
-                    {/* Footer Card (Total & Navigasi Grup) */}
+                    {/* Footer Card */}
                     <div style={{ padding: '10px 12px', backgroundColor: theme.bgCard, borderTop: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '13px', fontWeight: '800', color: theme.textUtama }}>Total: Rp{Number(transaksi.grand_total).toLocaleString('id-ID')}</span>
                       <div>
@@ -834,7 +874,7 @@ export default function Home() {
             )}
           </div>
         ) : (
-          /* Tampilan Tabel Tradisional (Hanya Aktif Jika di Layar Desktop) */
+          /* Tampilan Tabel Tradisional Desktop */
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
