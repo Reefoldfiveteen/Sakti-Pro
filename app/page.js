@@ -641,11 +641,14 @@ export default function Home() {
 
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
+          <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            {/* 🌟 UPGRADE LINGKARAN CONIC GRADIENT MENGGUNAKAN INDIKATOR WARNA BARU (HIJAU, MERAH, BIRU) */}
+            {/* 🌟 LINGKARAN GRADASI TIGA WARNA AMAN */}
             <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: gradienPieDinamis, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard }}>
-              <span style={{ fontSize: '12px', ...
-              fontWeight: '800', color: theme.textUtama }}>{metrik.totalTransaksiCount > 0 ? 'Aktif' : '0%'}</span>
+              <span style={{ fontSize: '12px', fontWeight: '800', color: theme.textUtama }}>
+                {metrik.totalTransaksiCount > 0 ? 'Aktif' : '0%'}
+              </span>
             </div>
             <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({metrik.persenJual}%)</div>
@@ -653,6 +656,7 @@ export default function Home() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({metrik.persenMasuk}%)</div>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
