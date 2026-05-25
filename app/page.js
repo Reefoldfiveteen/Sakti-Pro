@@ -15,7 +15,7 @@ export default function Home() {
   const [lebarLayar, setLebarLayar] = useState(typeof window !== 'undefined' ? window.innerWidth : 1150);
   const isMobile = lebarLayar <= 768;
 
-  // 🌟 AMUNISI UTAMA: Fallback state memory jika localStorage ditutup paksa oleh WebView APK
+  // 🌟 AMUNISI FALLBACK STATE: Token cadangan jika localStorage diblokir sistem WebView Android
   const [tokenCadangan, setTokenCadangan] = useState(null);
 
   useEffect(() => {
@@ -67,19 +67,14 @@ export default function Home() {
       setErrorPesan('');
       try {
         console.log("[SAKTI Bridge] Token Akun Native Android Berhasil Dikunci!");
-        
-        // Coba simpan ke localStorage, bungkus dengan try-catch agar tidak memicu crash jika dilarang oleh WebView
         try {
           localStorage.setItem('sakti_token_gdrive', idToken);
         } catch (e) {
-          console.warn("[SAKTI Optimizer] localStorage.setItem diblokir oleh sandboxed WebView APK, aman karena token dialihkan ke in-memory state.");
+          console.warn("localStorage.setItem diblokir sistem WebView, beralih penuh ke In-Memory State Cadangan.");
         }
-
-        // Kunci token ke state React agar fungsi sinkronisasi cloud punya jalur data mandiri
+        
         setTokenCadangan(idToken);
         setIsLoggedInGDrive(true);
-
-        // Langsung eksekusi sinkronisasi dengan passing token murni secara direct parameter
         await ambilDataDariDrive(idToken);
       } catch (err) {
         console.error("Error pemrosesan token jembatan Android:", err);
@@ -259,7 +254,7 @@ export default function Home() {
     }
   };
 
-  // 🌟 MODIFIKASI MULTI-TOKEN RESOLVER: Mendukung prioritas parameter murni & fallback state
+  // 🌟 MULTI-TOKEN RESOLVER SINKRONISASI
   const ambilDataDariDrive = async (tokenAktif) => {
     const token = tokenAktif || tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token) return;
@@ -434,7 +429,6 @@ export default function Home() {
     }
   };
 
-  // 🌟 CODES COMPRESSION SAKTI: CANVAS COMPRESSION HANDLER
   const handleUploadFoto = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -669,6 +663,10 @@ export default function Home() {
     }
   };
 
+  // 🌟 PERBAIKAN PRERENDER: Hitung variabel derajat secara lokal dan pastikan safety value di luar template literal global
+  const dJual = metrik.totalTransaksiCount > 0 ? (metrik.omzet / metrik.totalTransaksiCount) * 360 : 120;
+  const dKeluar = metrik.totalTransaksiCount > 0 ? (metrik.pengeluaran / metrik.totalTransaksiCount) * 360 : 120;
+
   return (
     <div style={{ maxWidth: '1150px', margin: isMobile ? '10px auto' : '40px auto', padding: isMobile ? '12px' : '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: theme.bgApp, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
       
@@ -740,7 +738,18 @@ export default function Home() {
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'left' }}>
-            <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: gradienPieDinamis, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 20px ' + theme.bgCard, flexShrink: 0 }}>
+            {/* 🌟 FIX REFERENCE ERROR: Inline Injection String Conic Gradient yang aman dari Prerender Crash */}
+            <div style={{ 
+              width: '100px', 
+              height: '100px', 
+              borderRadius: '50%', 
+              background: `conic-gradient(#10B981 0deg ${dJual}deg, #EF4444 ${dJual}deg ${dJual + dKeluar}deg, #3F51B5 ${dJual + dKeluar}deg 360deg)`, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              boxShadow: 'inset 0 0 0 20px ' + theme.bgCard, 
+              flexShrink: 0 
+            }}>
               <span style={{ fontSize: '12px', fontWeight: '800', color: theme.textUtama }}>
                 {metrik.totalTransaksiCount > 0 ? 'Kasir' : '0%'}
               </span>
