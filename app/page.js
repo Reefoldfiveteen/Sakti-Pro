@@ -307,7 +307,13 @@ export default function Home() {
         try {
           localStorage.setItem('sakti_sync_status', pesanSukses);
         } catch (e) {}
-        if(confirm(`Sukses terunggah ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
+
+        // 🌟 DI SINI KUNCI PERBAIKANNYA:
+        // Setelah sukses setor & merge di cloud, langsung tarik kembali data finalnya
+        // agar state 'daftarTransaksi' di layar HP/PC kamu ikut ter-refresh otomatis!
+        await ambilDataDariDrive(token);
+
+        if(confirm(`Sukses terunggah & disinkronkan ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
           window.open(resData.file_link, '_blank');
         }
       } else {
