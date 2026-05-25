@@ -70,7 +70,7 @@ export default function LogoSakti({ isDark }) {
         letterSpacing: '0.2px',
         opacity: 0.8
       }}>
-        Sistem Akuntansi POS Toko UMKM — Android APK & Web Build Ready
+        Sistem Akuntansi POS Toko UMKM dengan dukungan AI
       </p>
     </div>
   );

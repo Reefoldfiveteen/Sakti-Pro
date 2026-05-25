@@ -15,6 +15,9 @@ export default function Home() {
   const [lebarLayar, setLebarLayar] = useState(typeof window !== 'undefined' ? window.innerWidth : 1150);
   const isMobile = lebarLayar <= 768;
 
+  // 🌟 AMUNISI UTAMA: Fallback state memory jika localStorage ditutup paksa oleh WebView APK
+  const [tokenCadangan, setTokenCadangan] = useState(null);
+
   useEffect(() => {
     const handleResize = () => setLebarLayar(window.innerWidth);
     window.addEventListener('resize', handleResize);
@@ -64,8 +67,19 @@ export default function Home() {
       setErrorPesan('');
       try {
         console.log("[SAKTI Bridge] Token Akun Native Android Berhasil Dikunci!");
-        localStorage.setItem('sakti_token_gdrive', idToken);
+        
+        // Coba simpan ke localStorage, bungkus dengan try-catch agar tidak memicu crash jika dilarang oleh WebView
+        try {
+          localStorage.setItem('sakti_token_gdrive', idToken);
+        } catch (e) {
+          console.warn("[SAKTI Optimizer] localStorage.setItem diblokir oleh sandboxed WebView APK, aman karena token dialihkan ke in-memory state.");
+        }
+
+        // Kunci token ke state React agar fungsi sinkronisasi cloud punya jalur data mandiri
+        setTokenCadangan(idToken);
         setIsLoggedInGDrive(true);
+
+        // Langsung eksekusi sinkronisasi dengan passing token murni secara direct parameter
         await ambilDataDariDrive(idToken);
       } catch (err) {
         console.error("Error pemrosesan token jembatan Android:", err);
@@ -100,6 +114,7 @@ export default function Home() {
     
     if (tokenLokal) {
       setIsLoggedInGDrive(true);
+      setTokenCadangan(tokenLokal);
       setStatusSync(savedStatus);
     }
     setIntervalSync(savedInterval);
@@ -139,7 +154,7 @@ export default function Home() {
 
     localStorage.setItem('sakti_interval_sync', intervalSync);
     return () => clearInterval(autoSyncTimerRef.current);
-  }, [intervalSync, isLoggedInGDrive, daftarTransaksi]);
+  }, [intervalSync, isLoggedInGDrive, daftarTransaksi, tokenCadangan]);
 
   // PALET WARNA DYNAMIC VARIABLE
   const theme = {
@@ -200,10 +215,14 @@ export default function Home() {
 
   const simpanKeMemoriLokal = (dataTerbaru) => {
     setDaftarTransaksi(dataTerbaru);
-    localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataTerbaru));
+    try {
+      localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataTerbaru));
+    } catch (e) {}
     if (isLoggedInGDrive) {
       setStatusSync('Perubahan Belum Disinkronkan');
-      localStorage.setItem('sakti_sync_status', 'Perubahan Belum Disinkronkan');
+      try {
+        localStorage.setItem('sakti_sync_status', 'Perubahan Belum Disinkronkan');
+      } catch (e) {}
     }
   };
 
@@ -225,7 +244,10 @@ export default function Home() {
             return;
           }
           const token = tokenResponse.access_token;
-          localStorage.setItem('sakti_token_gdrive', token);
+          try {
+            localStorage.setItem('sakti_token_gdrive', token);
+          } catch (e) {}
+          setTokenCadangan(token);
           setIsLoggedInGDrive(true);
           await ambilDataDariDrive(token);
         },
@@ -237,7 +259,10 @@ export default function Home() {
     }
   };
 
-  const ambilDataDariDrive = async (token) => {
+  // 🌟 MODIFIKASI MULTI-TOKEN RESOLVER: Mendukung prioritas parameter murni & fallback state
+  const ambilDataDariDrive = async (tokenAktif) => {
+    const token = tokenAktif || tokenCadangan || localStorage.getItem('sakti_token_gdrive');
+    if (!token) return;
     try {
       setStatusSync('Memeriksa backup cloud...');
       const response = await fetch('/api/sync-drive', {
@@ -248,13 +273,17 @@ export default function Home() {
       if (res.success && res.data) {
         const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
         setDaftarTransaksi(dataCloud);
-        localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataCloud));
+        try {
+          localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataCloud));
+          localStorage.setItem('sakti_sync_status', '✨ Data Sinkron dengan Cloud');
+        } catch (e) {}
         setStatusSync('✨ Data Sinkron dengan Cloud');
-        localStorage.setItem('sakti_sync_status', '✨ Data Sinkron dengan Cloud');
         alert("Sukses Terhubung! Data rekap akuntansi lama Anda di Google Drive berhasil dipulihkan.");
       } else {
         setStatusSync('Terhubung (Backup Kosong)');
-        localStorage.setItem('sakti_sync_status', 'Terhubung (Backup Kosong)');
+        try {
+          localStorage.setItem('sakti_sync_status', 'Terhubung (Backup Kosong)');
+        } catch (e) {}
         alert("Sukses Terhubung! Belum ada data backup di akun Drive ini. Menggunakan data tabel saat ini.");
       }
     } catch (err) {
@@ -265,7 +294,7 @@ export default function Home() {
   };
 
   const handleSyncToGoogleDrive = async () => {
-    const token = localStorage.getItem('sakti_token_gdrive');
+    const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token) { handleLoginGDrive(); return; }
     if (daftarTransaksi.length === 0) { setErrorPesan("Tidak ada data tabel yang bisa dikirim!"); return; }
     setErrorPesan('');
@@ -280,7 +309,9 @@ export default function Home() {
       if (resData.success) {
         const pesanSukses = `☁️ Disinkronkan (${resData.sync_time})`;
         setStatusSync(pesanSukses);
-        localStorage.setItem('sakti_sync_status', pesanSukses);
+        try {
+          localStorage.setItem('sakti_sync_status', pesanSukses);
+        } catch (e) {}
         if(confirm(`Sukses terunggah ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
           window.open(resData.file_link, '_blank');
         }
@@ -295,7 +326,7 @@ export default function Home() {
   };
 
   const execSyncToDriveSilently = async () => {
-    const token = localStorage.getItem('sakti_token_gdrive');
+    const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token || daftarTransaksi.length === 0) return;
     try {
       const response = await fetch('/api/sync-drive', {
@@ -307,7 +338,9 @@ export default function Home() {
       if (resData.success) {
         const pesanAuto = `☁️ Auto Sync Aktif (${resData.sync_time})`;
         setStatusSync(pesanAuto);
-        localStorage.setItem('sakti_sync_status', pesanAuto);
+        try {
+          localStorage.setItem('sakti_sync_status', pesanAuto);
+        } catch (e) {}
       }
     } catch (e) {
       console.error("Background auto sync terhambat jaringan.");
@@ -317,11 +350,14 @@ export default function Home() {
   const handleLogoutGDrive = () => {
     if (confirm("Apakah Anda yakin ingin memutuskan akun Google Drive? Seluruh data tabel lokal akan dikosongkan demi keamanan privasi.")) {
       if (autoSyncTimerRef.current) clearInterval(autoSyncTimerRef.current);
-      localStorage.removeItem('sakti_token_gdrive');
-      localStorage.removeItem('sakti_interval_sync');
-      localStorage.removeItem('sakti_sync_status');
+      try {
+        localStorage.removeItem('sakti_token_gdrive');
+        localStorage.removeItem('sakti_interval_sync');
+        localStorage.removeItem('sakti_sync_status');
+        localStorage.setItem('sakti_riwayat_data', JSON.stringify([]));
+      } catch (e) {}
       setDaftarTransaksi([]);
-      localStorage.setItem('sakti_riwayat_data', JSON.stringify([]));
+      setTokenCadangan(null);
       setIsLoggedInGDrive(false);
       setIntervalSync('manual');
       setStatusSync('Belum Terhubung Cloud');
@@ -398,10 +434,42 @@ export default function Home() {
     }
   };
 
+  // 🌟 CODES COMPRESSION SAKTI: CANVAS COMPRESSION HANDLER
   const handleUploadFoto = (e) => {
-    const file = e.target.files[0]; if (!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setErrorPesan('');
     const reader = new FileReader();
-    reader.onloadend = () => { kirimKeBackend('foto', reader.result); };
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      
+      img.onload = () => {
+        const MAX_WIDTH = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        
+        console.log("[SAKTI Optimizer] Foto berhasil dikompresi untuk kestabilan Vercel.");
+        kirimKeBackend('foto', compressedBase64);
+      };
+    };
+    
     reader.readAsDataURL(file);
   };
 
@@ -482,7 +550,9 @@ export default function Home() {
     if (confirm("Apakah Anda yakin ingin mengosongkan seluruh isi tabel rekap?")) {
       simpanKeMemoriLokal([]);
       setStatusSync('Belum Sinkron');
-      localStorage.setItem('sakti_sync_status', 'Belum Sinkron');
+      try {
+        localStorage.setItem('sakti_sync_status', 'Belum Sinkron');
+      } catch (e) {}
     }
   };
 
@@ -599,10 +669,6 @@ export default function Home() {
     }
   };
 
-  const degJual = metrik.totalTransaksiCount > 0 ? (metrik.omzet / metrik.totalTransaksiCount) * 360 : 120;
-  const degKeluar = metrik.totalTransaksiCount > 0 ? (metrik.pengeluaran / metrik.totalTransaksiCount) * 360 : 120;
-  const gradienPieDinamis = `conic-gradient(#10B981 0deg ${degJual}deg, #EF4444 ${degJual}deg ${degJual + degKeluar}deg, #3F51B5 ${degJual + degKeluar}deg 360deg)`;
-
   return (
     <div style={{ maxWidth: '1150px', margin: isMobile ? '10px auto' : '40px auto', padding: isMobile ? '12px' : '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: theme.bgApp, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
       
@@ -707,7 +773,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* 🌟 PENYESUAIAN LOGIN: INTERFACE DETEKTOR JEMBATAN AKUN JAVASCRIPT ANDROID */}
           {!isLoggedInGDrive ? (
             <button 
               onClick={() => {
@@ -765,12 +830,11 @@ export default function Home() {
           <label htmlFor="upload-nota" style={{ display: 'block', textAlign: 'center', padding: '16px', borderRadius: '8px', backgroundColor: isLoading ? '#94A3B8' : '#10B981', color: '#FFFFFF', fontWeight: '700', cursor: 'pointer' }}>
             {isLoading ? '⏳ Sedang memproses...' : '📂 Pilih / Foto Nota Belanja'}
           </label>
-          {/* 🌟 UPGRADE INPUT: OTOMATIS POP-UP KAMERA DI HP & TETAP OPEN FILE DI LAPTOP */}
           <input 
             id="upload-nota" 
             type="file" 
             accept="image/*" 
-            capture={isMobile ? "environment" : undefined} // Jika di HP, langsung pemicu kamera belakang
+            capture={isMobile ? "environment" : undefined}
             onChange={handleUploadFoto} 
             disabled={isLoading} 
             style={{ display: 'none' }} 
@@ -795,7 +859,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* INTERFACE RESPONSIVE CHECK SYSTEM */}
         {isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
             {daftarTransaksi.length === 0 ? (
@@ -805,7 +868,6 @@ export default function Home() {
                 const isGrupSedangEdit = editingGroupIdx === tIdx;
                 return (
                   <div key={`card-grup-${tIdx}`} style={{ backgroundColor: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}`, overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                    {/* Header Card (Waktu & Tipe) */}
                     <div style={{ backgroundColor: theme.bgGrupRow, padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
                         {isGrupSedangEdit ? (
@@ -830,7 +892,6 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Items di dalam Card */}
                     <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {(transaksi.items || []).map((item, iIdx) => {
                         const isSedangEdit = editingItemKey === `${tIdx}-${iIdx}`;
@@ -863,7 +924,6 @@ export default function Home() {
                       })}
                     </div>
 
-                    {/* Footer Card */}
                     <div style={{ padding: '10px 12px', backgroundColor: theme.bgCard, borderTop: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '13px', fontWeight: '800', color: theme.textUtama }}>Total: Rp{Number(transaksi.grand_total).toLocaleString('id-ID')}</span>
                       <div>
