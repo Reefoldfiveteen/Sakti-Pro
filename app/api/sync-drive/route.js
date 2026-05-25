@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
+// 🌟 ENDPOINT POST: REKONSILIASI MULTIPLATFORM (TAMBAH, EDIT, HAPUS)
 export async function POST(request) {
   try {
     const { dataTransaksi, accessToken } = await request.json();
@@ -34,15 +35,18 @@ export async function POST(request) {
 
     const namaFileDb = "sakti_database.json";
     const listFile = await drive.files.list({
-      q: `name='${namaFileDb}' and '${folderId}' in parents and trashed=false`,
-      fields: 'files(id)',
+      q: `name='sakti_database.json' and '${folderId}' in parents and trashed=false`,
+      fields: 'files(id, webViewLink)',
     });
 
-    let dataFinalToBeSaved = dataIncoming.filter(item => !item.isDeleted); // Bersihkan data deleted bawaan dari device saat ini
+    // 🌟 Jangan langsung di-filter di awal agar bendera isDeleted dari HP bisa dibaca oleh Map
+    let dataFinalToBeSaved = dataIncoming; 
     let fileIdExist = null;
+    let webViewLink = null;
 
     if (listFile.data.files.length > 0) {
       fileIdExist = listFile.data.files[0].id;
+      webViewLink = listFile.data.files[0].webViewLink;
 
       try {
         const downloadExisting = await drive.files.get({ fileId: fileIdExist, alt: 'media' });
@@ -54,43 +58,39 @@ export async function POST(request) {
         if (Array.isArray(dataExistingInCloud) && Array.isArray(dataIncoming)) {
           const mapGabungan = new Map();
 
-          // 1. Masukkan data dari Cloud ke Map terlebih dahulu
+          // 1. Amankan pangkalan data lama dari Cloud ke dalam Map
           dataExistingInCloud.forEach(item => {
             const uniqueKey = item.id || `${item.tanggal}-${item.jam}-${item.grand_total}`;
             mapGabungan.set(uniqueKey, item);
           });
 
-          // 2. Bandingkan dengan data Incoming dari device (HP/PC)
+          // 2. Tabrakkan dengan data Incoming (HP/PC) menggunakan Hakim Timestamp 'updatedAt'
           dataIncoming.forEach(itemIncoming => {
             const uniqueKey = itemIncoming.id || `${itemIncoming.tanggal}-${itemIncoming.jam}-${itemIncoming.grand_total}`;
             const itemExisting = mapGabungan.get(uniqueKey);
 
             if (itemExisting) {
-              // Jika data di device ditandai hapus dan waktu hapusnya lebih baru, tandai untuk didelete
+              // Jika di device ditandai hapus, dan instruksi hapusnya lebih baru/setara -> Valid Hapus
               if (itemIncoming.isDeleted && (itemIncoming.updatedAt >= (itemExisting.updatedAt || 0))) {
-                mapGabungan.set(uniqueKey, { ...itemExisting, isDeleted: true });
+                mapGabungan.set(uniqueKey, itemIncoming); 
               } 
-              // Jika data di device diedit/diupdate dan waktunya lebih baru, terima perubahannya
+              // Jika di device ada update data biasa (edit) dan waktunya lebih baru -> Terima Perubahan
               else if (itemIncoming.updatedAt >= (itemExisting.updatedAt || 0)) {
                 mapGabungan.set(uniqueKey, itemIncoming);
               }
             } else {
-              // Jika data belum ada di cloud, langsung masukkan (selama tidak ditandai isDeleted)
+              // Jika barang baru dan tidak dalam kondisi terhapus -> Masukkan tabel
               if (!itemIncoming.isDeleted) {
                 mapGabungan.set(uniqueKey, itemIncoming);
               }
             }
           });
 
-          // 3. Filter keluar semua data yang sudah sah berstatus isDeleted: true
-          dataFinalToBeSaved = Array.from(mapGabungan.values())
-            .filter(item => !item.isDeleted)
-            .sort((a, b) => {
-              return new Date(`${b.tanggal.replace(/\//g, '-')}T${b.jam}`) - new Date(`${a.tanggal.replace(/\//g, '-')}T${a.jam}`);
-            });
+          // 3. Eksekusi pembersihan total barang bertanda isDeleted sebelum disimpan ke file JSON Drive
+          dataFinalToBeSaved = Array.from(mapGabungan.values()).filter(item => !item.isDeleted);
         }
       } catch (errDownload) {
-        console.error("Gagal otomatisasi merge, fallback menggunakan data incoming device.", errDownload);
+        console.error("Gagal melakukan merging cloud.", errDownload);
       }
     }
 
@@ -98,14 +98,26 @@ export async function POST(request) {
     const mediaStream = { mimeType: 'application/json', body: payloadStream };
 
     if (fileIdExist) {
-      await drive.files.update({ fileId: fileIdExist, media: mediaStream });
+      // 🌟 FIX POP-UP: Paksa Google API mengembalikan webViewLink saat update file
+      const hasilUpdate = await drive.files.update({
+        fileId: fileIdExist,
+        media: mediaStream,
+        fields: 'id, name, webViewLink',
+      });
+      if (hasilUpdate.data.webViewLink) webViewLink = hasilUpdate.data.webViewLink;
     } else {
-      await drive.files.create({ resource: { name: namaFileDb, parents: [folderId] }, media: mediaStream });
+      const hasilCreate = await drive.files.create({
+        resource: { name: namaFileDb, parents: [folderId] },
+        media: mediaStream,
+        fields: 'id, name, webViewLink',
+      });
+      webViewLink = hasilCreate.data.webViewLink;
     }
 
     return NextResponse.json({ 
       success: true, 
       sync_time: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+      file_link: webViewLink // Tautan dijamin terisi penuh!
     });
 
   } catch (error) {
@@ -113,7 +125,7 @@ export async function POST(request) {
   }
 }
 
-// GET ENDPOINT TETAP UTUH SAMA SEPERTI KEMARIN
+// 🌟 ENDPOINT GET: AMBIL DATA DARI CLOUD
 export async function GET(request) {
   try {
     const authHeader = request.headers.get('authorization');

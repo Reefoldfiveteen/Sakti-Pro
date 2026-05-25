@@ -216,9 +216,19 @@ export default function Home() {
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
-      const dateA = new Date(`${a.tanggal.replace(/\//g, '-')}T${a.jam}`);
-      const dateB = new Date(`${b.tanggal.replace(/\//g, '-')}T${b.jam}`);
-      return dateB - dateA; // Mengurutkan dari yang paling baru
+      // Bongkar string tanggal "DD/MM/YYYY" menjadi komponen murni [DD, MM, YYYY]
+      const partA = a.tanggal.split('/');
+      const partB = b.tanggal.split('/');
+      
+      // Jika formatnya pakai strip "DD-MM-YYYY", akomodasi juga demi keamanan data cache
+      const cleanPartA = partA.length === 3 ? partA : a.tanggal.split('-');
+      const cleanPartB = partB.length === 3 ? partB : b.tanggal.split('-');
+
+      // Rakit kembali ke format standar internasional yang dipahami JavaScript: YYYY-MM-DD
+      const isoDateA = `${cleanPartA[2]}-${cleanPartA[1]}-${cleanPartA[0]}T${a.jam}`;
+      const isoDateB = `${cleanPartB[2]}-${cleanPartB[1]}-${cleanPartB[0]}T${b.jam}`;
+
+      return new Date(isoDateB) - new Date(isoDateA);
     });
   };
 
