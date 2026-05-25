@@ -97,7 +97,6 @@ export default function Home() {
     if (dataLokal) {
       try {
         const parsedData = JSON.parse(dataLokal);
-        // Pastikan disortir kronologis saat load
         setDaftarTransaksi(urutkanTransaksi(parsedData));
       } catch (e) {
         console.error("Gagal memuat cache lokal.");
@@ -290,9 +289,6 @@ export default function Home() {
       const res = await response.json();
       if (res.success && res.data) {
         const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-        
-        // 🌟 KUNCI SYNC FIX: Biarkan data cloud masuk utuh (termasuk yang bernilai isDeleted dari device lain)
-        // agar siklus pertukaran bendera soft-delete berjalan seirama di semua perangkat
         simpanKeMemoriLokal(dataCloud);
         
         try {
@@ -428,7 +424,7 @@ export default function Home() {
       mediaRecorderRef.current.start();
       recognitionRef.current.start();
     } catch (err) {
-      setErrorPesan("Gagal mengakses mikrofon.");
+      setErrorPesan("Gagal accessing mikrofon.");
     }
   };
 
@@ -530,7 +526,6 @@ export default function Home() {
     }
   };
 
-  // 🌟 REFACTORING EDIT: Menggunakan id transaksi untuk mengunci data secara presisi
   const mulaiModeEdit = (idTransaksi, iIdx, item) => {
     setEditingItemKey(`${idTransaksi}-${iIdx}`);
     setEditBarang(item.barang); setEditQty(item.qty); setEditHarga(item.harga);
@@ -616,6 +611,120 @@ export default function Home() {
     if (confirm("Apakah Anda yakin ingin mengosongkan seluruh isi tabel rekap?")) {
       const dataBaru = daftarTransaksi.map(t => ({ ...t, isDeleted: true, updatedAt: Date.now() }));
       simpanKeMemoriLokal(dataBaru);
+    }
+  };
+
+  // 🌟 RE-INJECT: FUNGSI EXPORT EXCEL YANG SEMPAT HILANG
+  const handleExportExcel = async () => {
+    if (daftarTransaksi.filter(t => !t.isDeleted).length === 0) return;
+
+    try {
+      const ExcelJS = require('exceljs');
+      const saveAs = require('file-saver');
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Rekap SAKTI UMKM');
+
+      const barisData = [];
+      barisData.push(["LAPORAN KEUANGAN KASIR UMKM — SAKTI PRO ENTERPRISE"]);
+      barisData.push([`Tanggal Cetak Dokumen: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`]);
+      barisData.push([]); 
+
+      barisData.push(["📊 RINGKASAN KINERJA TOKO (DASBOR UTAMA)"]);
+      barisData.push(["Metrik Keuangan", "Nilai Nominal", "Status Evaluasi Bisnis"]);
+      barisData.push(["💰 Total Omzet Penjualan", metrik.omzet, "Pendapatan Kotor Toko"]);
+      barisData.push(["💸 Total Biaya / Pengeluaran", metrik.pengeluaran, "Biaya Operasional & Kulakan"]);
+      barisData.push(["💎 Total Pemasukan Tambahan", metrik.pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); 
+      barisData.push([
+        "📈 Profit Bersih Toko", 
+        metrik.untungBersih, 
+        metrik.untungBersih >= 0 ? "🟢 SURPLUS (UNTUNG)" : "🔴 DEFISIT (RUGI LABA)"
+      ]);
+      barisData.push([]); 
+
+      barisData.push(["📦 DAFTAR PRODUK PALING LARIS (TOP Fast-Moving)"]);
+      barisData.push(["Peringkat", "Nama Barang/Produk", "Total Volume Terjual"]);
+      if (metrik.produkTerlaris.length === 0) {
+        barisData.push(["-", "Belum ada produk terjual", "0 Pcs"]);
+      } else {
+        metrik.produkTerlaris.forEach((p, idx) => {
+          barisData.push([`Top ${idx + 1}`, p.nama, `${p.qty} Pcs`]);
+        });
+      }
+      barisData.push([]); 
+      barisData.push(["------------------------------------------------------------"]); 
+      barisData.push([]); 
+
+      barisData.push(["📋 JURNAL RINCIAN DETAIL HISTORI TRANSAKSI TOKO"]);
+      barisData.push(["KATEGORI / WAKTU TRANSAKSI", "RINCIAN ITEM BARANG", "QUANTITY (QTY)", "HARGA SATUAN (Rp)", "TOTAL SUBTOTAL (Rp)"]);
+
+      daftarTransaksi.filter(t => !t.isDeleted).forEach((transaksi) => {
+        barisData.push([
+          `📅 ${transaksi.tanggal} (${transaksi.jam} WIB)`, 
+          `🔹 [${transaksi.jenis.toUpperCase()}]`, 
+          "", 
+          "", 
+          `GRAND TOTAL: Rp ${Number(transaksi.grand_total).toLocaleString('id-ID')}`
+        ]);
+        
+        if (transaksi.items) {
+          transaksi.items.forEach((item) => {
+            barisData.push([
+              "↳ detail item", 
+              `📦 ${item.barang}`, 
+              Number(item.qty), 
+              Number(item.harga), 
+              Number(item.jumlah)
+            ]);
+          });
+        }
+      });
+
+      worksheet.addRows(barisData);
+
+      worksheet.columns = [
+        { width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }
+      ];
+
+      ['B6', 'B7', 'B8', 'B9'].forEach(cellRef => {
+        const cell = worksheet.getCell(cellRef);
+        if (cell.value !== undefined) {
+          cell.numFormat = '#,##0';
+        }
+      });
+
+      worksheet.getCell('F4').value = "📊 VISUALISASI CASHFLOW RATIO (DINAMIS TIGA SEGMEN)";
+      worksheet.getCell('F4').font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
+
+      worksheet.getCell('F6').value = "🟢 Penjualan (Omzet) :";
+      worksheet.getCell('F6').font = { fontWeight: '600' };
+      worksheet.getCell('G6').value = { 
+        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B6/(B6+B7+B8))*25, 0)) & " " & TEXT(B6/(B6+B7+B8), "0%"), "0%")' 
+      };
+      worksheet.getCell('G6').font = { color: { argb: 'FF10B981' }, bold: true };
+
+      worksheet.getCell('F7').value = "🔴 Pengeluaran (Biaya) :";
+      worksheet.getCell('F7').font = { fontWeight: '600' };
+      worksheet.getCell('G7').value = { 
+        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B7/(B6+B7+B8))*25, 0)) & " " & TEXT(B7/(B6+B7+B8), "0%"), "0%")' 
+      };
+      worksheet.getCell('G7').font = { color: { argb: 'FFEF4444' }, bold: true };
+
+      worksheet.getCell('F8').value = "🔵 Pemasukan (Suntikan Modal) :";
+      worksheet.getCell('F8').font = { fontWeight: '600' };
+      worksheet.getCell('G8').value = { 
+        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B8/(B6+B7+B8))*25, 0)) & " " & TEXT(B8/(B6+B7+B8), "0%"), "0%")' 
+      };
+      worksheet.getCell('G8').font = { color: { argb: 'FF3F51B5' }, bold: true };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const fileDate = new Date().toISOString().split('T')[0];
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Laporan_SAKTI_UMKM_Komprehensif_${fileDate}.xlsx`);
+
+    } catch (error) {
+      console.error("Gagal melakukan ekspor data:", error);
+      alert("Terjadi kesalahan teknis saat memproses laporan Excel.");
     }
   };
 
@@ -961,11 +1070,11 @@ export default function Home() {
                         <td style={{ padding: '10px 12px', textAlign: 'right', color: isMurniGelap ? '#E0E7FF' : '#1E1B4B', fontSize: '14px' }}>Total: Rp {Number(transaksi.grand_total).toLocaleString('id-ID')}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           {isGrupSedangEdit ? (
-                            <button type="button" onClick={() => simpanEditGrup(transaksi.id)} style={{ padding: '6px 12px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: 'none', carriage: 'pointer' }}>💾 Simpan</button>
+                            <button type="button" onClick={() => simpanEditGrup(transaksi.id)} style={{ padding: '6px 12px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>💾 Simpan</button>
                           ) : (
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                              <button type="button" onClick={() => mulaiEditGrup(transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, carriage: 'pointer' }}>⚙️ Edit</button>
-                              <button type="button" onClick={() => handleHapusGrup(transaksi.id)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', carriage: 'pointer' }}>❌ Hapus</button>
+                              <button type="button" onClick={() => mulaiEditGrup(transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit</button>
+                              <button type="button" onClick={() => handleHapusGrup(transaksi.id)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>❌ Hapus</button>
                             </div>
                           )}
                         </td>
@@ -981,11 +1090,11 @@ export default function Home() {
                             <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '700' }}>Rp {Number(item.jumlah).toLocaleString('id-ID')}</td>
                             <td style={{ padding: '8px 14px', textAlign: 'center' }}>
                               {isSedangEdit ? (
-                                <button type="button" onClick={() => simpanHasilEdit(transaksi.id, iIdx)} style={{ padding: '4px 8px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '12px', carriage: 'pointer' }}>💾 Simpan</button>
+                                <button type="button" onClick={() => simpanHasilEdit(transaksi.id, iIdx)} style={{ padding: '4px 8px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '12px', cursor: 'pointer' }}>💾 Simpan</button>
                               ) : (
                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                  <button type="button" onClick={() => mulaiModeEdit(transaksi.id, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', carriage: 'pointer' }}>✏️ Edit</button>
-                                  <button type="button" onClick={() => handleHapusItem(transaksi.id, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', carriage: 'pointer' }} title="Hapus Barang">🗑️</button>
+                                  <button type="button" onClick={() => mulaiModeEdit(transaksi.id, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
+                                  <button type="button" onClick={() => handleHapusItem(transaksi.id, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', cursor: 'pointer' }} title="Hapus Barang">🗑️</button>
                                 </div>
                               )}
                             </td>
