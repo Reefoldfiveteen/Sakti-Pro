@@ -28,14 +28,14 @@ export default function Home() {
   const [audioUrlPreview, setAudioUrlPreview] = useState('');
   const [audioBase64, setAudioBase64] = useState('');
 
-  // State Fitur Inline Editing DETAIL BARANG (Menggunakan ID Transaksi agar akurat)
+  // State Fitur Inline Editing DETAIL BARANG
   const [editingItemKey, setEditingItemKey] = useState(''); 
   const [editBarang, setEditBarang] = useState('');
   const [editQty, setEditQty] = useState('');
   const [editHarga, setEditHarga] = useState('');
 
-  // State Fitur Inline Editing GROUP TRANSAKSI (Menggunakan ID Transaksi)
-  const [editingGroupId, setEditingGroupId] = useState(null);
+  // State Fitur Inline Editing GROUP TRANSAKSI
+  const [editingGroupIdx, setEditingGroupIdx] = useState(null);
   const [editTanggal, setEditTanggal] = useState('');
   const [editJam, setEditJam] = useState('');
   const [editJenis, setEditJenis] = useState('');
@@ -96,8 +96,10 @@ export default function Home() {
     const dataLokal = localStorage.getItem('sakti_riwayat_data');
     if (dataLokal) {
       try {
+        // Otomatis urutkan saat pertama kali aplikasi dibuka agar layout rapi
         const parsedData = JSON.parse(dataLokal);
-        setDaftarTransaksi(urutkanTransaksi(parsedData));
+        const sortedData = urutkanTransaksi(parsedData);
+        setDaftarTransaksi(sortedData);
       } catch (e) {
         console.error("Gagal memuat cache lokal.");
       }
@@ -175,7 +177,7 @@ export default function Home() {
     const petaProduk = {};
 
     daftarTransaksi.forEach((t) => {
-      if (t.isDeleted) return; 
+      if (t.isDeleted) return; // Abaikan data soft-delete dalam kalkulasi metrik
       const totalGrup = Number(t.grand_total) || 0;
       if (t.jenis === 'Penjualan') {
         omzet += totalGrup;
@@ -210,16 +212,19 @@ export default function Home() {
 
   const metrik = hitungMetrikUMKM();
 
-  // 🌟 ENGINE CHRONOLOGICAL SORTING FIX: Menyusun akurat dari Waktu Terbaru -> Terlama (Format Tanggal Indo)
+  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM)
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
+      // Bongkar string tanggal "DD/MM/YYYY" menjadi komponen murni [DD, MM, YYYY]
       const partA = a.tanggal.split('/');
       const partB = b.tanggal.split('/');
       
+      // Jika formatnya pakai strip "DD-MM-YYYY", akomodasi juga demi keamanan data cache
       const cleanPartA = partA.length === 3 ? partA : a.tanggal.split('-');
       const cleanPartB = partB.length === 3 ? partB : b.tanggal.split('-');
 
+      // Rakit kembali ke format standar internasional yang dipahami JavaScript: YYYY-MM-DD
       const isoDateA = `${cleanPartA[2]}-${cleanPartA[1]}-${cleanPartA[0]}T${a.jam}`;
       const isoDateB = `${cleanPartB[2]}-${cleanPartB[1]}-${cleanPartB[0]}T${b.jam}`;
 
@@ -228,6 +233,7 @@ export default function Home() {
   };
 
   const simpanKeMemoriLokal = (dataTerbaru) => {
+    // 🌟 Selalu urutkan data sebelum disimpan ke state dan localStorage
     const dataTerurut = urutkanTransaksi(dataTerbaru);
     setDaftarTransaksi(dataTerurut);
     
@@ -289,6 +295,8 @@ export default function Home() {
       const res = await response.json();
       if (res.success && res.data) {
         const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+        
+        // Simpan dan urutkan otomatis data hasil tarikan dari cloud
         simpanKeMemoriLokal(dataCloud);
         
         try {
@@ -330,6 +338,7 @@ export default function Home() {
           localStorage.setItem('sakti_sync_status', pesanSukses);
         } catch (e) {}
 
+        // Setelah sukses setor & merge di cloud, langsung tarik kembali data finalnya
         await ambilDataDariDrive(token);
 
         if(confirm(`Sukses terunggah & disinkronkan ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
@@ -424,7 +433,7 @@ export default function Home() {
       mediaRecorderRef.current.start();
       recognitionRef.current.start();
     } catch (err) {
-      setErrorPesan("Gagal accessing mikrofon.");
+      setErrorPesan("Gagal mengakses mikrofon.");
     }
   };
 
@@ -492,8 +501,6 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
-  const { omzet, pengeluaran, pemasukanLain, untungBersih, produkTerlaris, persenJual, persenKeluar, persenMasuk, totalTransaksiCount } = metrik;
-
   const kirimKeBackend = async (tipe, data) => {
     try {
       setErrorPesan(''); setIsLoading(true); 
@@ -504,13 +511,11 @@ export default function Home() {
       });
       const resData = await response.json();
       if (resData.success) {
-        const timestampLokal = Date.now();
-        const uuidTransaksi = `trx-${timestampLokal}-${Math.random().toString(36).substr(2, 9)}`;
-        
+        // 🌟 SUNTIKKAN METADATA BARU
         const transaksiBaru = {
           ...resData.data,
-          id: uuidTransaksi, 
-          updatedAt: timestampLokal,
+          id: `trx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ID Unik Mutlak
+          updatedAt: Date.now(),
           isDeleted: false
         };
         const dataBaru = [transaksiBaru, ...daftarTransaksi];
@@ -526,97 +531,81 @@ export default function Home() {
     }
   };
 
-  const mulaiModeEdit = (idTransaksi, iIdx, item) => {
-    setEditingItemKey(`${idTransaksi}-${iIdx}`);
+  const mulaiModeEdit = (tIdx, iIdx, item) => {
+    setEditingItemKey(`${tIdx}-${iIdx}`);
     setEditBarang(item.barang); setEditQty(item.qty); setEditHarga(item.harga);
   };
 
-  const simpanHasilEdit = (idTransaksi, iIdx) => {
+  const simpanHasilEdit = (tIdx, iIdx) => {
     const q = parseInt(editQty) || 0; 
     const h = parseInt(editHarga) || 0;
+    const dataBaru = [...daftarTransaksi];
     
-    const dataBaru = daftarTransaksi.map(t => {
-      if (t.id === idTransaksi) {
-        const updatedItems = [...t.items];
-        updatedItems[iIdx] = { barang: editBarang, qty: q, harga: h, jumlah: q * h };
-        return {
-          ...t,
-          items: updatedItems,
-          grand_total: updatedItems.reduce((acc, curr) => acc + curr.jumlah, 0),
-          updatedAt: Date.now()
-        };
-      }
-      return t;
-    });
+    dataBaru[tIdx].items[iIdx] = { barang: editBarang, qty: q, harga: h, jumlah: q * h };
+    dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
+    
+    // 🌟 UPDATE TIMESTAMP MODIFIKASI
+    dataBaru[tIdx].updatedAt = Date.now();
     
     simpanKeMemoriLokal(dataBaru);
     setEditingItemKey(''); 
   };
 
-  const mulaiEditGrup = (transaksi) => {
-    setEditingGroupId(transaksi.id);
+  const mulaiEditGrup = (tIdx, transaksi) => {
+    setEditingGroupIdx(tIdx);
     setEditTanggal(transaksi.tanggal); setEditJam(transaksi.jam); setEditJenis(transaksi.jenis);
   };
 
-  const simpanEditGrup = (idTransaksi) => {
-    const dataBaru = daftarTransaksi.map(t => {
-      if (t.id === idTransaksi) {
-        return {
-          ...t,
-          tanggal: editTanggal,
-          jam: editJam,
-          jenis: editJenis,
-          updatedAt: Date.now()
-        };
-      }
-      return t;
-    });
+  const simpanEditGrup = (tIdx) => {
+    const dataBaru = [...daftarTransaksi];
+    dataBaru[tIdx].tanggal = editTanggal; dataBaru[tIdx].jam = editJam; dataBaru[tIdx].jenis = editJenis;
+    
+    // 🌟 UPDATE TIMESTAMP MODIFIKASI
+    dataBaru[tIdx].updatedAt = Date.now();
+    
     simpanKeMemoriLokal(dataBaru);
-    setEditingGroupId(null); 
+    setEditingGroupIdx(null); 
   };
 
-  const handleHapusGrup = (idTransaksi) => {
+  const handleHapusGrup = (tIdx) => {
     if (confirm("Apakah Anda yakin ingin menghapus seluruh grup transaksi ini beserta item di dalamnya?")) {
-      const dataBaru = daftarTransaksi.map(t => {
-        if (t.id === idTransaksi) {
-          return { ...t, isDeleted: true, updatedAt: Date.now() };
-        }
-        return t;
-      });
+      const dataBaru = [...daftarTransaksi];
+      // 🌟 TANDAI BENDERA DELETED-NYA
+      dataBaru[tIdx].isDeleted = true;
+      dataBaru[tIdx].updatedAt = Date.now();
+      
       simpanKeMemoriLokal(dataBaru);
     }
   };
 
-  const handleHapusItem = (idTransaksi, iIdx) => {
+  const handleHapusItem = (tIdx, iIdx) => {
     if (confirm("Hapus item barang ini dari detail rekapitulasi transaksi?")) {
-      const dataBaru = daftarTransaksi.map(t => {
-        if (t.id === idTransaksi) {
-          const updatedItems = t.items.filter((_, idx) => idx !== iIdx);
-          const isGrupKosong = updatedItems.length === 0;
-          return {
-            ...t,
-            items: updatedItems,
-            grand_total: updatedItems.reduce((acc, curr) => acc + curr.jumlah, 0),
-            isDeleted: isGrupKosong,
-            updatedAt: Date.now()
-          };
-        }
-        return t;
-      });
+      const dataBaru = [...daftarTransaksi];
+      dataBaru[tIdx].items = dataBaru[tIdx].items.filter((_, idx) => idx !== iIdx);
+      
+      dataBaru[tIdx].updatedAt = Date.now();
+
+      if (dataBaru[tIdx].items.length === 0) {
+        dataBaru[tIdx].isDeleted = true;
+      } else {
+        dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
+      }
       simpanKeMemoriLokal(dataBaru);
     }
   };
 
-  const handleHapusAllVisual = () => {
+  const handleHapusSemuaData = () => {
     if (confirm("Apakah Anda yakin ingin mengosongkan seluruh isi tabel rekap?")) {
-      const dataBaru = daftarTransaksi.map(t => ({ ...t, isDeleted: true, updatedAt: Date.now() }));
-      simpanKeMemoriLokal(dataBaru);
+      simpanKeMemoriLokal([]);
+      setStatusSync('Belum Sinkron');
+      try {
+        localStorage.setItem('sakti_sync_status', 'Belum Sinkron');
+      } catch (e) {}
     }
   };
 
-  // 🌟 SELESAI RESTORE: FUNGSI EXPORT EXCEL UNTUK MENCEGAH PRERENDER CRASH
   const handleExportExcel = async () => {
-    if (daftarTransaksi.filter(t => !t.isDeleted).length === 0) return;
+    if (daftarTransaksi.length === 0) return;
 
     try {
       const ExcelJS = require('exceljs');
@@ -658,6 +647,7 @@ export default function Home() {
       barisData.push(["📋 JURNAL RINCIAN DETAIL HISTORI TRANSAKSI TOKO"]);
       barisData.push(["KATEGORI / WAKTU TRANSAKSI", "RINCIAN ITEM BARANG", "QUANTITY (QTY)", "HARGA SATUAN (Rp)", "TOTAL SUBTOTAL (Rp)"]);
 
+      // Hanya masukkan data yang tidak terhapus ke lembar Excel
       daftarTransaksi.filter(t => !t.isDeleted).forEach((transaksi) => {
         barisData.push([
           `📅 ${transaksi.tanggal} (${transaksi.jam} WIB)`, 
@@ -728,8 +718,9 @@ export default function Home() {
     }
   };
 
-  const dJual = totalTransaksiCount > 0 ? (omzet / totalTransaksiCount) * 360 : 120;
-  const dKeluar = totalTransaksiCount > 0 ? (pengeluaran / totalTransaksiCount) * 360 : 120;
+  // 🌟 PERBAIKAN PRERENDER: Hitung variabel derajat secara lokal dan pastikan safety value di luar template literal global
+  const dJual = metrik.totalTransaksiCount > 0 ? (metrik.omzet / metrik.totalTransaksiCount) * 360 : 120;
+  const dKeluar = metrik.totalTransaksiCount > 0 ? (metrik.pengeluaran / metrik.totalTransaksiCount) * 360 : 120;
 
   return (
     <div style={{ maxWidth: '1150px', margin: isMobile ? '10px auto' : '40px auto', padding: isMobile ? '12px' : '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: theme.bgApp, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
@@ -755,23 +746,24 @@ export default function Home() {
         </div>
       </div>
 
+
       {/* PANEL KARTU METRIK UTAMA TOKO (RESPONSIVE GRID) */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: isMobile ? '10px' : '20px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: isMurniGelap ? '#065F46' : '#E6F4EA', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#A7F3D0' : '#137333', textTransform: 'uppercase' }}>💰 Total Omzet Penjualan</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {omzet.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.omzet.toLocaleString('id-ID')}</h2>
         </div>
         <div style={{ backgroundColor: isMurniGelap ? '#991B1B' : '#FCE8E6', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#FCA5A5' : '#C5221F', textTransform: 'uppercase' }}>💸 Biaya / Keluar</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {pengeluaran.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pengeluaran.toLocaleString('id-ID')}</h2>
         </div>
         <div style={{ backgroundColor: isMurniGelap ? '#1E3A8A' : '#E0E7FF', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#93C5FD' : '#3730A3', textTransform: 'uppercase' }}>💎 Pemasukan Lain</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {pemasukanLain.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pemasukanLain.toLocaleString('id-ID')}</h2>
         </div>
-        <div style={{ backgroundColor: untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
-          <h2 style={{ margin: '4px 0 0 0', color: theme.textUtama, fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {untungBersih.toLocaleString('id-ID')}</h2>
+        <div style={{ backgroundColor: metrik.untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: metrik.untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
+          <h2 style={{ margin: '4px 0 0 0', color: theme.textUtama, fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.untungBersih.toLocaleString('id-ID')}</h2>
         </div>
       </div>
 
@@ -779,18 +771,18 @@ export default function Home() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <h4 style={{ margin: '0 0 16px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📦 TOP 3 PRODUK TERLARIS (STOK FAST-MOVING)</h4>
-          {produkTerlaris.length === 0 ? (
+          {metrik.produkTerlaris.length === 0 ? (
             <p style={{ fontSize: '13px', color: theme.textMuted, fontStyle: 'italic' }}>Belum ada data barang terjual.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {produkTerlaris.map((p, idx) => (
+              {metrik.produkTerlaris.map((p, idx) => (
                 <div key={idx}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px', color: theme.textUtama, fontWeight: '600' }}>
                     <span>{idx + 1}. {p.nama}</span>
                     <span>{p.qty} Pcs</span>
                   </div>
                   <div style={{ width: '100%', height: '10px', backgroundColor: isMurniGelap ? '#334155' : '#E2E8F0', borderRadius: '10px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min((p.qty / produkTerlaris[0].qty) * 100, 100)}%`, height: '100%', backgroundColor: '#4F46E5', borderRadius: '10px', transition: 'width 0.5s ease' }}></div>
+                    <div style={{ width: `${Math.min((p.qty / metrik.produkTerlaris[0].qty) * 100, 100)}%`, height: '100%', backgroundColor: '#4F46E5', borderRadius: '10px', transition: 'width 0.5s ease' }}></div>
                   </div>
                 </div>
               ))}
@@ -813,13 +805,13 @@ export default function Home() {
               flexShrink: 0 
             }}>
               <span style={{ fontSize: '12px', fontWeight: '800', color: theme.textUtama }}>
-                {totalTransaksiCount > 0 ? 'Kasir' : '0%'}
+                {metrik.totalTransaksiCount > 0 ? 'Kasir' : '0%'}
               </span>
             </div>
             <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({persenJual}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({persenKeluar}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({persenMasuk}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({metrik.persenJual}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({metrik.persenKeluar}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({metrik.persenMasuk}%)</div>
             </div>
           </div>
         </div>
@@ -924,7 +916,7 @@ export default function Home() {
           
           <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', flexDirection: isMobile ? 'column' : 'row' }}>
             {daftarTransaksi.filter(t => !t.isDeleted).length > 0 && (
-              <button type="button" onClick={handleHapusAllVisual} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: '1px solid #EF4444', backgroundColor: 'transparent', color: '#EF4444', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>🗑️ Kosongkan</button>
+              <button type="button" onClick={handleHapusSemuaData} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: '1px solid #EF4444', backgroundColor: 'transparent', color: '#EF4444', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>🗑️ Kosongkan</button>
             )}
             <button type="button" onClick={handleExportExcel} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#FFFFFF', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>📊 Export Excel</button>
           </div>
@@ -935,10 +927,10 @@ export default function Home() {
             {daftarTransaksi.filter(t => !t.isDeleted).length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px', color: theme.textMuted, fontSize: '13px' }}>Belum ada data transaksi.</div>
             ) : (
-              daftarTransaksi.filter(t => !t.isDeleted).map((transaksi) => {
-                const isGrupSedangEdit = editingGroupId === transaksi.id;
+              daftarTransaksi.filter(t => !t.isDeleted).map((transaksi, tIdx) => {
+                const isGrupSedangEdit = editingGroupIdx === tIdx;
                 return (
-                  <div key={`card-grup-${transaksi.id}`} style={{ backgroundColor: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}`, overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                  <div key={`card-grup-${tIdx}`} style={{ backgroundColor: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}`, overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                     <div style={{ backgroundColor: theme.bgGrupRow, padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
                         {isGrupSedangEdit ? (
@@ -965,9 +957,9 @@ export default function Home() {
 
                     <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {(transaksi.items || []).map((item, iIdx) => {
-                        const isSedangEdit = editingItemKey === `${transaksi.id}-${iIdx}`;
+                        const isSedangEdit = editingItemKey === `${tIdx}-${iIdx}`;
                         return (
-                          <div key={`card-item-${transaksi.id}-${iIdx}`} style={{ display: 'flex', flexDirection: 'column', paddingBottom: '8px', borderBottom: `1px dashed ${theme.border}`, fontSize: '13px', color: theme.textUtama }}>
+                          <div key={`card-item-${tIdx}-${iIdx}`} style={{ display: 'flex', flexDirection: 'column', paddingBottom: '8px', borderBottom: `1px dashed ${theme.border}`, fontSize: '13px', color: theme.textUtama }}>
                             {isSedangEdit ? (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: theme.bgApp, padding: '8px', borderRadius: '6px' }}>
                                 <input type="text" value={editBarang} onChange={(e) => setEditBarang(e.target.value)} style={{ padding: '6px', borderRadius: '4px', fontSize: '12px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
@@ -975,7 +967,7 @@ export default function Home() {
                                   <input type="number" placeholder="Qty" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '60px', padding: '6px', borderRadius: '4px', fontSize: '12px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
                                   <input type="number" placeholder="Harga" value={editHarga} onChange={(e) => setEditHarga(e.target.value)} style={{ flex: 1, padding: '6px', borderRadius: '4px', fontSize: '12px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText }} />
                                 </div>
-                                <button type="button" onClick={() => simpanHasilEdit(transaksi.id, iIdx)} style={{ padding: '6px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '11px', borderRadius: '4px', border: 'none' }}>💾 Simpan Barang</button>
+                                <button type="button" onClick={() => simpanHasilEdit(tIdx, iIdx)} style={{ padding: '6px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '11px', borderRadius: '4px', border: 'none' }}>💾 Simpan Barang</button>
                               </div>
                             ) : (
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -985,8 +977,8 @@ export default function Home() {
                                 </div>
                                 <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                   <span style={{ fontWeight: '700' }}>Rp{Number(item.jumlah).toLocaleString('id-ID')}</span>
-                                  <button type="button" onClick={() => mulaiModeEdit(transaksi.id, iIdx, item)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Edit">✏️</button>
-                                  <button type="button" onClick={() => handleHapusItem(transaksi.id, iIdx)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Hapus">🗑️</button>
+                                  <button type="button" onClick={() => mulaiModeEdit(tIdx, iIdx, item)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Edit">✏️</button>
+                                  <button type="button" onClick={() => handleHapusItem(tIdx, iIdx)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Hapus">🗑️</button>
                                 </div>
                               </div>
                             )}
@@ -999,11 +991,11 @@ export default function Home() {
                       <span style={{ fontSize: '13px', fontWeight: '800', color: theme.textUtama }}>Total: Rp{Number(transaksi.grand_total).toLocaleString('id-ID')}</span>
                       <div>
                         {isGrupSedangEdit ? (
-                          <button type="button" onClick={() => simpanEditGrup(transaksi.id)} style={{ padding: '4px 10px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>💾 Simpan</button>
+                          <button type="button" onClick={() => simpanEditGrup(tIdx)} style={{ padding: '4px 10px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>💾 Simpan</button>
                         ) : (
                           <div style={{ display: 'flex', gap: '4px' }}>
-                            <button type="button" onClick={() => mulaiEditGrup(transaksi)} style={{ padding: '4px 8px', backgroundColor: theme.bgGrupRow, color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>⚙️ Edit</button>
-                            <button type="button" onClick={() => handleHapusGrup(transaksi.id)} style={{ padding: '4px 8px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>❌ Hapus</button>
+                            <button type="button" onClick={() => mulaiEditGrup(tIdx, transaksi)} style={{ padding: '4px 8px', backgroundColor: theme.bgGrupRow, color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>⚙️ Edit</button>
+                            <button type="button" onClick={() => handleHapusGrup(tIdx)} style={{ padding: '4px 8px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '4px', border: 'none' }}>❌ Hapus</button>
                           </div>
                         )}
                       </div>
@@ -1031,10 +1023,10 @@ export default function Home() {
                 {daftarTransaksi.filter(t => !t.isDeleted).length === 0 ? (
                   <tr><td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: theme.textMuted }}>Belum ada data transaksi.</td></tr>
                 ) : (
-                  daftarTransaksi.filter(t => !t.isDeleted).map((transaksi) => {
-                    const isGrupSedangEdit = editingGroupId === transaksi.id;
+                  daftarTransaksi.filter(t => !t.isDeleted).map((transaksi, tIdx) => {
+                    const isGrupSedangEdit = editingGroupIdx === tIdx;
                     return [
-                      <tr key={`grup-${transaksi.id}`} style={{ backgroundColor: theme.bgGrupRow, borderBottom: `1px solid ${theme.border}`, fontWeight: '700', fontSize: '13px', color: theme.textUtama }}>
+                      <tr key={`grup-${tIdx}`} style={{ backgroundColor: theme.bgGrupRow, borderBottom: `1px solid ${theme.border}`, fontWeight: '700', fontSize: '13px', color: theme.textUtama }}>
                         <td style={{ padding: '10px 12px' }}>
                           {isGrupSedangEdit ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1070,20 +1062,19 @@ export default function Home() {
                         <td style={{ padding: '10px 12px', textAlign: 'right', color: isMurniGelap ? '#E0E7FF' : '#1E1B4B', fontSize: '14px' }}>Total: Rp {Number(transaksi.grand_total).toLocaleString('id-ID')}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           {isGrupSedangEdit ? (
-                            <button type="button" onClick={() => simpanEditGrup(transaksi.id)} style={{ padding: '6px 12px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>💾 Simpan</button>
+                            <button type="button" onClick={() => simpanEditGrup(tIdx)} style={{ padding: '6px 12px', backgroundColor: '#4F46E5', color: '#FFF', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>💾 Simpan</button>
                           ) : (
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                              <button type="button" onClick={() => mulaiEditGrup(transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit</button>
-                              {/* 🌟 FIX ACTION: Parameter sukses dialihkan penuh mengirim transaksi.id string */}
-                              <button type="button" onClick={() => handleHapusGrup(transaksi.id)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>❌ Hapus</button>
+                              <button type="button" onClick={() => mulaiEditGrup(tIdx, transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit</button>
+                              <button type="button" onClick={() => handleHapusGrup(tIdx)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>❌ Hapus</button>
                             </div>
                           )}
                         </td>
                       </tr>,
                       ...(transaksi.items || []).map((item, iIdx) => {
-                        const isSedangEdit = editingItemKey === `${transaksi.id}-${iIdx}`;
+                        const isSedangEdit = editingItemKey === `${tIdx}-${iIdx}`;
                         return (
-                          <tr key={`item-${transaksi.id}-${iIdx}`} style={{ borderBottom: `1px solid ${theme.border}`, fontSize: '14px', backgroundColor: theme.bgItemRow, color: theme.textUtama }}>
+                          <tr key={`item-${tIdx}-${iIdx}`} style={{ borderBottom: `1px solid ${theme.border}`, fontSize: '14px', backgroundColor: theme.bgItemRow, color: theme.textUtama }}>
                             <td style={{ padding: '12px 14px', color: theme.textMuted, fontSize: '12px', fontStyle: 'italic' }}>↳ detail item</td>
                             <td style={{ padding: '8px 14px' }}>{isSedangEdit ? <input type="text" value={editBarang} onChange={(e) => setEditBarang(e.target.value)} style={{ width: '90%', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>📦 {item.barang}</span>}</td>
                             <td style={{ padding: '8px 14px', textAlign: 'center' }}>{isSedangEdit ? <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '50px', textAlign: 'center', padding: '6px', borderRadius: '4px', border: `1px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.inputText, fontWeight: '600' }} /> : <span>{item.qty}</span>}</td>
@@ -1091,12 +1082,11 @@ export default function Home() {
                             <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '700' }}>Rp {Number(item.jumlah).toLocaleString('id-ID')}</td>
                             <td style={{ padding: '8px 14px', textAlign: 'center' }}>
                               {isSedangEdit ? (
-                                <button type="button" onClick={() => simpanHasilEdit(transaksi.id, iIdx)} style={{ padding: '4px 8px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '12px', cursor: 'pointer' }}>💾 Simpan</button>
+                                <button type="button" onClick={() => simpanHasilEdit(tIdx, iIdx)} style={{ padding: '4px 8px', backgroundColor: '#6366F1', color: '#FFF', fontSize: '12px', cursor: 'pointer' }}>💾 Simpan</button>
                               ) : (
                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                  <button type="button" onClick={() => mulaiModeEdit(transaksi.id, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
-                                  {/* 🌟 FIX ACTION ITEM: Parameter sukses dialihkan penuh mengirim transaksi.id string */}
-                                  <button type="button" onClick={() => handleHapusItem(transaksi.id, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', cursor: 'pointer' }} title="Hapus Barang">🗑️</button>
+                                  <button type="button" onClick={() => mulaiModeEdit(tIdx, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
+                                  <button type="button" onClick={() => handleHapusItem(tIdx, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', cursor: 'pointer' }} title="Hapus Barang">🗑️</button>
                                 </div>
                               )}
                             </td>
