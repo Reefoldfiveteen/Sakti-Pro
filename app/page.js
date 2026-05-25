@@ -210,7 +210,7 @@ export default function Home() {
 
   const metrik = hitungMetrikUMKM();
 
-  // 🌟 ENGINE CHRONOLOGICAL SORTING FIX: Menyusun akurat dari Waktu Terbaru -> Terlama
+  // 🌟 ENGINE CHRONOLOGICAL SORTING FIX: Menyusun akurat dari Waktu Terbaru -> Terlama (Format Tanggal Indo)
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
@@ -614,7 +614,7 @@ export default function Home() {
     }
   };
 
-  // 🌟 RE-INJECT: FUNGSI EXPORT EXCEL YANG SEMPAT HILANG
+  // 🌟 SELESAI RESTORE: FUNGSI EXPORT EXCEL UNTUK MENCEGAH PRERENDER CRASH
   const handleExportExcel = async () => {
     if (daftarTransaksi.filter(t => !t.isDeleted).length === 0) return;
 
@@ -1074,6 +1074,7 @@ export default function Home() {
                           ) : (
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                               <button type="button" onClick={() => mulaiEditGrup(transaksi)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: isMurniGelap ? '#475569' : '#FFF', color: theme.textUtama, fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>⚙️ Edit</button>
+                              {/* 🌟 FIX ACTION: Parameter sukses dialihkan penuh mengirim transaksi.id string */}
                               <button type="button" onClick={() => handleHapusGrup(transaksi.id)} disabled={isLoading} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#EF4444', fontSize: '11px', fontWeight: '700', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>❌ Hapus</button>
                             </div>
                           )}
@@ -1094,6 +1095,7 @@ export default function Home() {
                               ) : (
                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                   <button type="button" onClick={() => mulaiModeEdit(transaksi.id, iIdx, item)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: isMurniGelap ? '#334155' : '#F8FAFC', color: theme.textUtama, fontSize: '12px', cursor: 'pointer' }}>✏️ Edit</button>
+                                  {/* 🌟 FIX ACTION ITEM: Parameter sukses dialihkan penuh mengirim transaksi.id string */}
                                   <button type="button" onClick={() => handleHapusItem(transaksi.id, iIdx)} disabled={isLoading} style={{ padding: '4px 8px', backgroundColor: 'transparent', color: '#EF4444', fontSize: '12px', border: 'none', cursor: 'pointer' }} title="Hapus Barang">🗑️</button>
                                 </div>
                               )}
