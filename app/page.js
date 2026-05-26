@@ -214,8 +214,13 @@ export default function Home() {
   };
 
   const metrik = hitungMetrikUMKM();
+  const { omzet, pengeluaran, pemasukanLain, untungBersih, produkTerlaris, persenJual, persenKeluar, persenMasuk, totalTransaksiCount } = metrik;
 
-  // 🌟 FIX ENGINE CHRONOLOGICAL SORTING: Mutlak berbaris dari Terkini ke Terlama (Format Kasir Indo)
+  // 🌟 FIX DIAGRAM DEGREE DECLARATION POSITION: Diletakkan tepat di bawah metrik agar terbaca sempurna saat prerender
+  const dJual = totalTransaksiCount > 0 ? (omzet / totalTransaksiCount) * 360 : 120;
+  const dKeluar = totalTransaksiCount > 0 ? (pengeluaran / totalTransaksiCount) * 360 : 120;
+
+  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM)
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
@@ -240,7 +245,6 @@ export default function Home() {
       localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataTerurut));
     } catch (e) {}
     
-    // 🌟 Set tanda waktu Time-Mark internal setiap kali ada data lokal yang berubah
     try {
       localStorage.setItem('sakti_last_time_mark', Date.now().toString());
     } catch (e) {}
@@ -286,7 +290,6 @@ export default function Home() {
     }
   };
 
-  // 🌟 MULTI-TOKEN RESOLVER SINKRONISASI
   const ambilDataDariDrive = async (tokenAktif) => {
     const token = tokenAktif || tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token) return;
@@ -299,8 +302,6 @@ export default function Home() {
       const res = await response.json();
       if (res.success && res.data) {
         const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-        
-        // Simpan data dan set urutan kronologisnya
         simpanKeMemoriLokal(dataCloud);
         
         try {
@@ -322,7 +323,6 @@ export default function Home() {
     }
   };
 
-  // 🌟 SINKRONISASI STRATEGI IDE RIF: Kirim payload beserta penanda Device Source dan Time-Mark
   const handleSyncToGoogleDrive = async () => {
     const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token) { handleLoginGDrive(); return; }
@@ -347,7 +347,6 @@ export default function Home() {
       const resData = await response.json();
       if (resData.success) {
         if (resData.outdated) {
-          // Jika cloud ternyata lebih baru, paksa device ini untuk mengunduh versi cloud terlebih dahulu!
           await ambilDataDariDrive(token);
           alert(resData.message);
         } else {
@@ -393,7 +392,7 @@ export default function Home() {
       });
       const resData = await response.json();
       if (resData.success && !resData.outdated) {
-        const pesanAuto = `☁️ Auto Sync Hack Bekerja (${resData.sync_time})`;
+        const pesanAuto = `☁️ Auto Sync Aktif (${resData.sync_time})`;
         setStatusSync(pesanAuto);
         try {
           localStorage.setItem('sakti_sync_status', pesanAuto);
@@ -530,29 +529,6 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
-  const kirimKeBackend = async (tipe, data) => {
-    try {
-      setErrorPesan(''); setIsLoading(true); 
-      const response = await fetch('/api/sakti', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipe, dataInput: data }),
-      });
-      const resData = await response.json();
-      if (resData.success) {
-        const dataBaru = [resData.data, ...daftarTransaksi];
-        simpanKeMemoriLokal(dataBaru);
-        setInputText('');
-      } else {
-        setErrorPesan(resData.error || "Gagal memproses transaksi.");
-      }
-    } catch (err) {
-      setErrorPesan("Gagal menghubungi server lokal backend.");
-    } finally {
-      setIsLoading(false); 
-    }
-  };
-
   const mulaiModeEdit = (tIdx, iIdx, item) => {
     setEditingItemKey(`${tIdx}-${iIdx}`);
     setEditBarang(item.barang); setEditQty(item.qty); setEditHarga(item.harga);
@@ -565,6 +541,7 @@ export default function Home() {
     
     dataBaru[tIdx].items[iIdx] = { barang: editBarang, qty: q, harga: h, jumlah: q * h };
     dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
+    dataBaru[tIdx].updatedAt = Date.now();
     
     simpanKeMemoriLokal(dataBaru);
     setEditingItemKey(''); 
@@ -583,8 +560,7 @@ export default function Home() {
     setEditingGroupIdx(null); 
   };
 
-  // 🌟 PERBAIKAN MURNI HAPUS (HARD-DELETE): Lenyap instan dari array murni agar index tIdx 100% konsisten
-  const handleHrup = (tIdx) => {
+  const handleHapusGrup = (tIdx) => {
     if (confirm("Apakah Anda yakin ingin menghapus seluruh grup transaksi ini beserta item di dalamnya?")) {
       const dataBaru = daftarTransaksi.filter((_, idx) => idx !== tIdx);
       simpanKeMemoriLokal(dataBaru);
@@ -595,10 +571,11 @@ export default function Home() {
     if (confirm("Hapus item barang ini dari detail rekapitulasi transaksi?")) {
       const dataBaru = [...daftarTransaksi];
       dataBaru[tIdx].items = dataBaru[tIdx].items.filter((_, idx) => idx !== iIdx);
-      
+      dataBaru[tIdx].updatedAt = Date.now();
+
       if (dataBaru[tIdx].items.length === 0) {
-        const dataBersih = dataBaru.filter((_, idx) => idx !== tIdx);
-        simpanKeMemoriLokal(dataBersih);
+        const dataClean = dataBaru.filter((_, idx) => idx !== tIdx);
+        simpanKeMemoriLokal(dataClean);
       } else {
         dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
         simpanKeMemoriLokal(dataBaru);
@@ -612,10 +589,8 @@ export default function Home() {
     }
   };
 
-  // 🌟 AMAN DARI PRERENDER CRASH: Generator file Excel rekap otomatis
   const handleExportExcel = async () => {
     if (daftarTransaksi.length === 0) return;
-
     try {
       const ExcelJS = require('exceljs');
       const saveAs = require('file-saver');
@@ -633,11 +608,7 @@ export default function Home() {
       barisData.push(["💰 Total Omzet Penjualan", metrik.omzet, "Pendapatan Kotor Toko"]);
       barisData.push(["💸 Total Biaya / Pengeluaran", metrik.pengeluaran, "Biaya Operasional & Kulakan"]);
       barisData.push(["💎 Total Pemasukan Tambahan", metrik.pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); 
-      barisData.push([
-        "📈 Profit Bersih Toko", 
-        metrik.untungBersih, 
-        metrik.untungBersih >= 0 ? "🟢 SURPLUS (UNTUNG)" : "🔴 DEFISIT (RUGI LABA)"
-      ]);
+      barisData.push(["📈 Profit Bersih Toko", metrik.untungBersih, metrik.untungBersih >= 0 ? "🟢 SURPLUS (UNTUNG)" : "🔴 DEFISIT (RUGI LABA)"]);
       barisData.push([]); 
 
       barisData.push(["📦 DAFTAR PRODUK PALING LARIS (TOP Fast-Moving)"]);
@@ -664,62 +635,40 @@ export default function Home() {
           "", 
           `GRAND TOTAL: Rp ${Number(transaksi.grand_total).toLocaleString('id-ID')}`
         ]);
-        
         if (transaksi.items) {
           transaksi.items.forEach((item) => {
-            barisData.push([
-              "↳ detail item", 
-              `📦 ${item.barang}`, 
-              Number(item.qty), 
-              Number(item.harga), 
-              Number(item.jumlah)
-            ]);
+            barisData.push(["↳ detail item", `📦 ${item.barang}`, Number(item.qty), Number(item.harga), Number(item.jumlah)]);
           });
         }
       });
 
       worksheet.addRows(barisData);
-
-      worksheet.columns = [
-        { width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }
-      ];
+      worksheet.columns = [{ width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }];
 
       ['B6', 'B7', 'B8', 'B9'].forEach(cellRef => {
         const cell = worksheet.getCell(cellRef);
-        if (cell.value !== undefined) {
-          cell.numFormat = '#,##0';
-        }
+        if (cell.value !== undefined) cell.numFormat = '#,##0';
       });
 
       worksheet.getCell('F4').value = "📊 VISUALISASI CASHFLOW RATIO (DINAMIS TIGA SEGMEN)";
       worksheet.getCell('F4').font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
 
       worksheet.getCell('F6').value = "🟢 Penjualan (Omzet) :";
-      worksheet.getCell('F6').font = { fontWeight: '600' };
-      worksheet.getCell('G6').value = { 
-        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B6/(B6+B7+B8))*25, 0)) & " " & TEXT(B6/(B6+B7+B8), "0%"), "0%")' 
-      };
+      worksheet.getCell('G6').value = { formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B6/(B6+B7+B8))*25, 0)) & " " & TEXT(B6/(B6+B7+B8), "0%"), "0%")' };
       worksheet.getCell('G6').font = { color: { argb: 'FF10B981' }, bold: true };
 
       worksheet.getCell('F7').value = "🔴 Pengeluaran (Biaya) :";
-      worksheet.getCell('F7').font = { fontWeight: '600' };
-      worksheet.getCell('G7').value = { 
-        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B7/(B6+B7+B8))*25, 0)) & " " & TEXT(B7/(B6+B7+B8), "0%"), "0%")' 
-      };
+      worksheet.getCell('G7').value = { formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B7/(B6+B7+B8))*25, 0)) & " " & TEXT(B7/(B6+B7+B8), "0%"), "0%")' };
       worksheet.getCell('G7').font = { color: { argb: 'FFEF4444' }, bold: true };
 
       worksheet.getCell('F8').value = "🔵 Pemasukan (Suntikan Modal) :";
-      worksheet.getCell('F8').font = { fontWeight: '600' };
-      worksheet.getCell('G8').value = { 
-        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B8/(B6+B7+B8))*25, 0)) & " " & TEXT(B8/(B6+B7+B8), "0%"), "0%")' 
-      };
+      worksheet.getCell('G8').value = { formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B8/(B6+B7+B8))*25, 0)) & " " & TEXT(B8/(B6+B7+B8), "0%"), "0%")' };
       worksheet.getCell('G8').font = { color: { argb: 'FF3F51B5' }, bold: true };
 
       const buffer = await workbook.xlsx.writeBuffer();
       const fileDate = new Date().toISOString().split('T')[0];
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `Laporan_SAKTI_UMKM_Komprehensif_${fileDate}.xlsx`);
-
     } catch (error) {
       console.error("Gagal melakukan ekspor data:", error);
       alert("Terjadi kesalahan teknis saat memproses laporan Excel.");
@@ -740,7 +689,6 @@ export default function Home() {
           </p>
         </div>
 
-        {/* CONTROLLER SWITCH TEMA */}
         <div style={{ display: 'flex', backgroundColor: theme.thBg, padding: '4px', borderRadius: '10px', border: `1px solid ${theme.border}`, width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
           {['light', 'dark', 'system'].map((t) => (
             <button key={t} onClick={() => setModeTema(t)} style={{ flex: isMobile ? 1 : 'none', padding: '6px 12px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', textTransform: 'capitalize', backgroundColor: modeTema === t ? '#4F46E5' : 'transparent', color: modeTema === t ? '#FFFFFF' : theme.textMuted, transition: 'all 0.2s ease' }}>
@@ -750,43 +698,42 @@ export default function Home() {
         </div>
       </div>
 
-
-      {/* PANEL KARTU METRIK UTAMA TOKO (RESPONSIVE GRID) */}
+      {/* PANEL KARTU METRIK UTAMA TOKO */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: isMobile ? '10px' : '20px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: isMurniGelap ? '#065F46' : '#E6F4EA', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#A7F3D0' : '#137333', textTransform: 'uppercase' }}>💰 Total Omzet Penjualan</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.omzet.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {omzet.toLocaleString('id-ID')}</h2>
         </div>
         <div style={{ backgroundColor: isMurniGelap ? '#991B1B' : '#FCE8E6', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#FCA5A5' : '#C5221F', textTransform: 'uppercase' }}>💸 Biaya / Keluar</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pengeluaran.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {pengeluaran.toLocaleString('id-ID')}</h2>
         </div>
         <div style={{ backgroundColor: isMurniGelap ? '#1E3A8A' : '#E0E7FF', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#93C5FD' : '#3730A3', textTransform: 'uppercase' }}>💎 Pemasukan Lain</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pemasukanLain.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {pemasukanLain.toLocaleString('id-ID')}</h2>
         </div>
-        <div style={{ backgroundColor: metrik.untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: metrik.untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
-          <h2 style={{ margin: '4px 0 0 0', color: theme.textUtama, fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.untungBersih.toLocaleString('id-ID')}</h2>
+        <div style={{ backgroundColor: untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
+          <h2 style={{ margin: '4px 0 0 0', color: theme.textUtama, fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {untungBersih.toLocaleString('id-ID')}</h2>
         </div>
       </div>
 
       {/* VISUALISASI GRAFIK TOKO UMKM */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginBottom: '25px' }}>
-        <div style={{ backgroundColor: theme.bgApp, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
+        <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <h4 style={{ margin: '0 0 16px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📦 TOP 3 PRODUK TERLARIS (STOK FAST-MOVING)</h4>
-          {metrik.produkTerlaris.length === 0 ? (
+          {produkTerlaris.length === 0 ? (
             <p style={{ fontSize: '13px', color: theme.textMuted, fontStyle: 'italic' }}>Belum ada data barang terjual.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {metrik.produkTerlaris.map((p, idx) => (
+              {produkTerlaris.map((p, idx) => (
                 <div key={idx}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px', color: theme.textUtama, fontWeight: '600' }}>
                     <span>{idx + 1}. {p.nama}</span>
                     <span>{p.qty} Pcs</span>
                   </div>
                   <div style={{ width: '100%', height: '10px', backgroundColor: isMurniGelap ? '#334155' : '#E2E8F0', borderRadius: '10px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min((p.qty / metrik.produkTerlaris[0].qty) * 100, 100)}%`, height: '100%', backgroundColor: '#4F46E5', borderRadius: '10px', transition: 'width 0.5s ease' }}></div>
+                    <div style={{ width: `${Math.min((p.qty / produkTerlaris[0].qty) * 100, 100)}%`, height: '100%', backgroundColor: '#4F46E5', borderRadius: '10px', transition: 'width 0.5s ease' }}></div>
                   </div>
                 </div>
               ))}
@@ -794,7 +741,7 @@ export default function Home() {
           )}
         </div>
 
-        <div style={{ backgroundColor: theme.bgApp, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h4 style={{ margin: '0 0 12px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📊 PROPORSI KEUANGAN (CASHFLOW RATIO TIGA SEGMEN)</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'left' }}>
             <div style={{ 
@@ -809,13 +756,13 @@ export default function Home() {
               flexShrink: 0 
             }}>
               <span style={{ fontSize: '12px', fontWeight: '800', color: theme.textUtama }}>
-                {metrik.totalTransaksiCount > 0 ? 'Kasir' : '0%'}
+                {totalTransaksiCount > 0 ? 'Kasir' : '0%'}
               </span>
             </div>
             <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({metrik.persenJual}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({metrik.persenKeluar}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({metrik.persenMasuk}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({persenJual}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({persenKeluar}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({persenMasuk}%)</div>
             </div>
           </div>
         </div>
