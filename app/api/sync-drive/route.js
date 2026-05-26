@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
-// 🌟 ENDPOINT POST: HAKIM TIME-MARK OTOMATIS (Mencegah Saling Timpa Buta)
+// 🌟 ENDPOINT POST: HAKIM TIME-MARK GLOBAL (Strategi Lintas Platform Aman & Akurat)
 export async function POST(request) {
   try {
     const { dataTransaksi, accessToken, deviceSource, timeMark } = await request.json();
@@ -36,7 +36,7 @@ export async function POST(request) {
 
     const namaFileDb = "sakti_database.json";
     const listFile = await drive.files.list({
-      q: `name='${namaFileDb}' and '${folderId}' in parents and trashed=false`,
+      q: `name='sakti_database.json' and '${folderId}' in parents and trashed=false`,
       fields: 'files(id, webViewLink, description)',
     });
 
@@ -49,35 +49,27 @@ export async function POST(request) {
       fileIdExist = listFile.data.files[0].id;
       webViewLink = listFile.data.files[0].webViewLink;
       
-      // Membaca metadata timeMark lama yang tersimpan di deskripsi file Drive
+      // 🌟 EKSEKUSI HAKIM: Baca catatan metadata `timeMark` yang disimpan di deskripsi file Drive
       const cloudDescription = listFile.data.files[0].description || "";
       if (cloudDescription.includes("timeMark:")) {
         cloudTimeMark = Number(cloudDescription.split("timeMark:")[1]) || 0;
       }
 
-      try {
-        // 🌟 ATURAN EMAS IDE RIF: Jika data di cloud ternyata LEBIH BARU daripada data perangkat saat ini,
-        // Tolak proses overwrite, kembalikan sinyal agar frontend melakukan pembaruan otomatis (GET) terlebih dahulu!
-        if (cloudTimeMark > incomingTimeMark) {
-          return NextResponse.json({ 
-            success: true, 
-            outdated: true, 
-            message: "Data di Cloud lebih baru. Tampilan tabel otomatis diperbarui." 
-          });
-        }
-      } catch (errCheck) {
-        console.error("Gagal verifikasi timeMark cloud.", errCheck);
+      // Aturan Emas Ide Rif: Jika data di cloud ternyata memiliki jejak waktu LEBIH BARU daripada data perangkat ini,
+      // Tolak overwrite, paksa frontend kembalikan status outdated agar layar otomatis memicu pembaruan (GET) data.
+      if (cloudTimeMark > incomingTimeMark) {
+        return NextResponse.json({ 
+          success: true, 
+          outdated: true, 
+          message: "Data di Cloud lebih baru! Tampilan tabel otomatis diperbarui ke versi gres." 
+        });
       }
     }
 
-    // Bungkus payload bersama metadata Device dan TimeMark terbaru ke dalam stream JSON baku
     const payloadStream = JSON.stringify(dataFinalToBeSaved);
-    const mediaStream = { 
-      mimeType: 'application/json', 
-      body: payloadStream 
-    };
+    const mediaStream = { mimeType: 'application/json', body: payloadStream };
 
-    // Buat catatan penanda deskripsi file Google Drive
+    // Bungkus metadata penanda modifikasi akhir ke properti deskripsi file di Drive
     const metaDescription = `device:${deviceSource || 'unknown'}|timeMark:${incomingTimeMark}`;
 
     if (fileIdExist) {
@@ -109,7 +101,7 @@ export async function POST(request) {
   }
 }
 
-// 🌟 ENDPOINT GET: AMBIL DATA DARI CLOUD (TETAP STABIL)
+// 🌟 2. ENDPOINT UNTUK AMBIL DATA (GET) - 100% UTAH DAN STABIL
 export async function GET(request) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -121,7 +113,7 @@ export async function GET(request) {
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
     const listFile = await drive.files.list({ q: "name='sakti_database.json' and trashed=false", fields: 'files(id)' });
-    if (listFile.data.files.length === 0) return NextResponse.json({ success: false, error: "Belum ada backup." }, { status: 404 });
+    if (listFile.data.files.length === 0) return NextResponse.json({ success: false, error: "Belum ada backup di akun Drive ini." }, { status: 404 });
 
     const fileId = listFile.data.files[0].id;
     const kontenFile = await drive.files.get({ fileId, alt: 'media' });
