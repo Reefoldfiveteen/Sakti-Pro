@@ -443,7 +443,7 @@ export default function Home() {
         setAudioUrlPreview(url);
         const reader = new FileReader();
         reader.onloadend = () => { setAudioBase64(reader.result); };
-        reader.readAsDataURL(audioBlob);
+        reader.readAsDataURL(audioBlob); // 🌟 FIX: Ubah dari 'file' menjadi 'audioBlob'
         stream.getTracks().forEach(track => track.stop());
       };
       recognitionRef.current = new SpeechRecognition();
