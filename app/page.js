@@ -56,10 +56,145 @@ export default function Home() {
   const audioChunksRef = useRef([]);
   const autoSyncTimerRef = useRef(null);
 
-  // 🌟 DETEKTOR SUMBER PERANGKAT (IDE RIF DEVICE MARK)
+  // 🌟 DETEKTOR SUMBER PERANGKAT AKURAT (IDE RIF DEVICE MARK)
   const dapatkanDeviceSource = () => {
     if (typeof window !== 'undefined' && window.AndroidJSInterface) return 'android';
     return 'website';
+  };
+
+  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM)
+  const urutkanTransaksi = (data) => {
+    if (!Array.isArray(data)) return [];
+    return [...data].sort((a, b) => {
+      const partA = a.tanggal.split('/');
+      const partB = b.tanggal.split('/');
+      
+      const cleanPartA = partA.length === 3 ? partA : a.tanggal.split('-');
+      const cleanPartB = partB.length === 3 ? partB : b.tanggal.split('-');
+
+      const isoDateA = `${cleanPartA[2]}-${cleanPartA[1]}-${cleanPartA[0]}T${a.jam}`;
+      const isoDateB = `${cleanPartB[2]}-${cleanPartB[1]}-${cleanPartB[0]}T${b.jam}`;
+
+      return new Date(isoDateB) - new Date(isoDateA);
+    });
+  };
+
+  // 🌟 MULTI-TOKEN RESOLVER SINKRONISASI
+  const ambilDataDariDrive = async (tokenAktif) => {
+    const token = tokenAktif || tokenCadangan || localStorage.getItem('sakti_token_gdrive');
+    if (!token) return;
+    try {
+      setStatusSync('Memeriksa backup cloud...');
+      const response = await fetch('/api/sync-drive', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const res = await response.json();
+      if (res.success && res.data) {
+        const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+        
+        // Simpan data dan set urutan kronologisnya
+        const dataTerurut = urutkanTransaksi(dataCloud);
+        setDaftarTransaksi(dataTerurut);
+        try {
+          localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataTerurut));
+          localStorage.setItem('sakti_sync_status', '✨ Data Sinkron dengan Cloud');
+        } catch (e) {}
+        setStatusSync('✨ Data Sinkron dengan Cloud');
+        alert("Sukses Terhubung! Data rekap akuntansi lama Anda di Google Drive berhasil dipulihkan.");
+      } else {
+        setStatusSync('Terhubung (Backup Kosong)');
+        try {
+          localStorage.setItem('sakti_sync_status', 'Terhubung (Backup Kosong)');
+        } catch (e) {}
+        alert("Sukses Terhubung! Belum ada data backup di akun Drive ini. Menggunakan data tabel saat ini.");
+      }
+    } catch (err) {
+      setErrorPesan("Gagal memulihkan database dari cloud.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // 🌟 SINKRONISASI STRATEGI IDE RIF: Kirim payload beserta penanda Device Source dan Time-Mark
+  const handleSyncToGoogleDrive = async () => {
+    const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
+    if (!token) { handleLoginGDrive(); return; }
+    if (daftarTransaksi.length === 0) { setErrorPesan("Tidak ada data tabel yang bisa dikirim!"); return; }
+    setErrorPesan('');
+    setIsSyncing(true);
+    
+    const currentDevice = dapatkanDeviceSource();
+    const currentLocalTimeMark = localStorage.getItem('sakti_last_time_mark') || Date.now().toString();
+
+    try {
+      const response = await fetch('/api/sync-drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          dataTransaksi: JSON.stringify(daftarTransaksi), 
+          accessToken: token,
+          deviceSource: currentDevice,
+          timeMark: currentLocalTimeMark
+        }),
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        if (resData.outdated) {
+          await ambilDataDariDrive(token);
+          alert(resData.message);
+        } else {
+          const pesanSukses = `☁️ Disinkronkan (${resData.sync_time})`;
+          setStatusSync(pesanSukses);
+          try {
+            localStorage.setItem('sakti_sync_status', pesanSukses);
+          } catch (e) {}
+
+          await ambilDataDariDrive(token);
+
+          if(confirm(`Sukses terunggah & disinkronkan ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
+            window.open(resData.file_link, '_blank');
+          }
+        }
+      } else {
+        setErrorPesan(resData.error || "Gagal melakukan enkripsi data cloud.");
+      }
+    } catch (err) {
+      setErrorPesan("Server lokal backend terputus saat transmisi.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const execSyncToDriveSilently = async () => {
+    const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
+    if (!token || daftarTransaksi.length === 0) return;
+    
+    const currentDevice = dapatkanDeviceSource();
+    const currentLocalTimeMark = localStorage.getItem('sakti_last_time_mark') || Date.now().toString();
+
+    try {
+      const response = await fetch('/api/sync-drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          dataTransaksi: JSON.stringify(daftarTransaksi), 
+          accessToken: token,
+          deviceSource: currentDevice,
+          timeMark: currentLocalTimeMark
+        })
+      });
+      const resData = await response.json();
+      if (resData.success && !resData.outdated) {
+        const pesanAuto = `☁️ Auto Sync Aktif (${resData.sync_time})`;
+        setStatusSync(pesanAuto);
+        try {
+          localStorage.setItem('sakti_sync_status', pesanAuto);
+        } catch (e) {}
+      }
+    } catch (e) {
+      console.error("Background auto sync terhambat jaringan.");
+    }
   };
 
   // 🌟 JEMBATAN AKUN (JAVASCRIPT BRIDGE) UNTUK LOGIN AUTOMATIS NATIVE PERANGKAT ANDROID
@@ -216,26 +351,8 @@ export default function Home() {
   const metrik = hitungMetrikUMKM();
   const { omzet, pengeluaran, pemasukanLain, untungBersih, produkTerlaris, persenJual, persenKeluar, persenMasuk, totalTransaksiCount } = metrik;
 
-  // 🌟 FIX DIAGRAM DEGREE DECLARATION POSITION: Diletakkan tepat di bawah metrik agar terbaca sempurna saat prerender
   const dJual = totalTransaksiCount > 0 ? (omzet / totalTransaksiCount) * 360 : 120;
   const dKeluar = totalTransaksiCount > 0 ? (pengeluaran / totalTransaksiCount) * 360 : 120;
-
-  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM)
-  const urutkanTransaksi = (data) => {
-    if (!Array.isArray(data)) return [];
-    return [...data].sort((a, b) => {
-      const partA = a.tanggal.split('/');
-      const partB = b.tanggal.split('/');
-      
-      const cleanPartA = partA.length === 3 ? partA : a.tanggal.split('-');
-      const cleanPartB = partB.length === 3 ? partB : b.tanggal.split('-');
-
-      const isoDateA = `${cleanPartA[2]}-${cleanPartA[1]}-${cleanPartA[0]}T${a.jam}`;
-      const isoDateB = `${cleanPartB[2]}-${cleanPartB[1]}-${cleanPartB[0]}T${b.jam}`;
-
-      return new Date(isoDateB) - new Date(isoDateA);
-    });
-  };
 
   const simpanKeMemoriLokal = (dataTerbaru) => {
     const dataTerurut = urutkanTransaksi(dataTerbaru);
@@ -290,119 +407,6 @@ export default function Home() {
     }
   };
 
-  const ambilDataDariDrive = async (tokenAktif) => {
-    const token = tokenAktif || tokenCadangan || localStorage.getItem('sakti_token_gdrive');
-    if (!token) return;
-    try {
-      setStatusSync('Memeriksa backup cloud...');
-      const response = await fetch('/api/sync-drive', {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const res = await response.json();
-      if (res.success && res.data) {
-        const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-        simpanKeMemoriLokal(dataCloud);
-        
-        try {
-          localStorage.setItem('sakti_sync_status', '✨ Data Sinkron dengan Cloud');
-        } catch (e) {}
-        setStatusSync('✨ Data Sinkron dengan Cloud');
-        alert("Sukses Terhubung! Data rekap akuntansi lama Anda di Google Drive berhasil dipulihkan.");
-      } else {
-        setStatusSync('Terhubung (Backup Kosong)');
-        try {
-          localStorage.setItem('sakti_sync_status', 'Terhubung (Backup Kosong)');
-        } catch (e) {}
-        alert("Sukses Terhubung! Belum ada data backup di akun Drive ini. Menggunakan data tabel saat ini.");
-      }
-    } catch (err) {
-      setErrorPesan("Gagal memulihkan database dari cloud.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleSyncToGoogleDrive = async () => {
-    const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
-    if (!token) { handleLoginGDrive(); return; }
-    if (daftarTransaksi.length === 0) { setErrorPesan("Tidak ada data tabel yang bisa dikirim!"); return; }
-    setErrorPesan('');
-    setIsSyncing(true);
-    
-    const currentDevice = dapatkanDeviceSource();
-    const currentLocalTimeMark = localStorage.getItem('sakti_last_time_mark') || Date.now().toString();
-
-    try {
-      const response = await fetch('/api/sync-drive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          dataTransaksi: JSON.stringify(daftarTransaksi), 
-          accessToken: token,
-          deviceSource: currentDevice,
-          timeMark: currentLocalTimeMark
-        }),
-      });
-      const resData = await response.json();
-      if (resData.success) {
-        if (resData.outdated) {
-          await ambilDataDariDrive(token);
-          alert(resData.message);
-        } else {
-          const pesanSukses = `☁️ Disinkronkan (${resData.sync_time})`;
-          setStatusSync(pesanSukses);
-          try {
-            localStorage.setItem('sakti_sync_status', pesanSukses);
-          } catch (e) {}
-
-          await ambilDataDariDrive(token);
-
-          if(confirm(`Sukses terunggah & disinkronkan ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
-            window.open(resData.file_link, '_blank');
-          }
-        }
-      } else {
-        setErrorPesan(resData.error || "Gagal melakukan enkripsi data cloud.");
-      }
-    } catch (err) {
-      setErrorPesan("Server lokal backend terputus saat transmisi.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const execSyncToDriveSilently = async () => {
-    const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
-    if (!token || daftarTransaksi.length === 0) return;
-    
-    const currentDevice = dapatkanDeviceSource();
-    const currentLocalTimeMark = localStorage.getItem('sakti_last_time_mark') || Date.now().toString();
-
-    try {
-      const response = await fetch('/api/sync-drive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          dataTransaksi: JSON.stringify(daftarTransaksi), 
-          accessToken: token,
-          deviceSource: currentDevice,
-          timeMark: currentLocalTimeMark
-        })
-      });
-      const resData = await response.json();
-      if (resData.success && !resData.outdated) {
-        const pesanAuto = `☁️ Auto Sync Aktif (${resData.sync_time})`;
-        setStatusSync(pesanAuto);
-        try {
-          localStorage.setItem('sakti_sync_status', pesanAuto);
-        } catch (e) {}
-      }
-    } catch (e) {
-      console.error("Background auto sync terhambat jaringan.");
-    }
-  };
-
   const handleLogoutGDrive = () => {
     if (confirm("Apakah Anda yakin ingin memutuskan akun Google Drive? Seluruh data tabel lokal akan dikosongkan demi keamanan privasi.")) {
       if (autoSyncTimerRef.current) clearInterval(autoSyncTimerRef.current);
@@ -443,7 +447,7 @@ export default function Home() {
         setAudioUrlPreview(url);
         const reader = new FileReader();
         reader.onloadend = () => { setAudioBase64(reader.result); };
-        reader.readAsDataURL(audioBlob); // 🌟 FIX: Ubah dari 'file' menjadi 'audioBlob'
+        reader.readAsDataURL(audioBlob); // 🌟 PREVENT CRASH FIX: Diubah murni ke 'audioBlob' agar pengolahan AI normal lagi
         stream.getTracks().forEach(track => track.stop());
       };
       recognitionRef.current = new SpeechRecognition();
@@ -529,6 +533,35 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
+  const kirimKeBackend = async (tipe, data) => {
+    try {
+      setErrorPesan(''); setIsLoading(true); 
+      const response = await fetch('/api/sakti', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipe, dataInput: data }),
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        // 🌟 SUNTIKKAN METADATA BARU
+        const transaksiBaru = {
+          ...resData.data,
+          id: `trx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
+          updatedAt: Date.now()
+        };
+        const dataBaru = [transaksiBaru, ...daftarTransaksi];
+        simpanKeMemoriLokal(dataBaru);
+        setInputText('');
+      } else {
+        setErrorPesan(resData.error || "Gagal memproses transaksi.");
+      }
+    } catch (err) {
+      setErrorPesan("Gagal menghubungi server lokal backend.");
+    } finally {
+      setIsLoading(false); 
+    }
+  };
+
   const mulaiModeEdit = (tIdx, iIdx, item) => {
     setEditingItemKey(`${tIdx}-${iIdx}`);
     setEditBarang(item.barang); setEditQty(item.qty); setEditHarga(item.harga);
@@ -541,7 +574,6 @@ export default function Home() {
     
     dataBaru[tIdx].items[iIdx] = { barang: editBarang, qty: q, harga: h, jumlah: q * h };
     dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
-    dataBaru[tIdx].updatedAt = Date.now();
     
     simpanKeMemoriLokal(dataBaru);
     setEditingItemKey(''); 
@@ -560,6 +592,7 @@ export default function Home() {
     setEditingGroupIdx(null); 
   };
 
+  // 🌟 FIX HARD-DELETE JALUR MURNI TIDX: Langsung memotong array lokal agar sinkronisasi time-mark murni
   const handleHapusGrup = (tIdx) => {
     if (confirm("Apakah Anda yakin ingin menghapus seluruh grup transaksi ini beserta item di dalamnya?")) {
       const dataBaru = daftarTransaksi.filter((_, idx) => idx !== tIdx);
@@ -589,6 +622,7 @@ export default function Home() {
     }
   };
 
+  // 🌟 SELESAI SUSUN ULANG DEKLARASI: Diletakkan di atas penarikan komponen JSX agar mencegah prerender error
   const handleExportExcel = async () => {
     if (daftarTransaksi.length === 0) return;
     try {
@@ -605,18 +639,18 @@ export default function Home() {
 
       barisData.push(["📊 RINGKASAN KINERJA TOKO (DASBOR UTAMA)"]);
       barisData.push(["Metrik Keuangan", "Nilai Nominal", "Status Evaluasi Bisnis"]);
-      barisData.push(["💰 Total Omzet Penjualan", metrik.omzet, "Pendapatan Kotor Toko"]);
-      barisData.push(["💸 Total Biaya / Pengeluaran", metrik.pengeluaran, "Biaya Operasional & Kulakan"]);
-      barisData.push(["💎 Total Pemasukan Tambahan", metrik.pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); 
-      barisData.push(["📈 Profit Bersih Toko", metrik.untungBersih, metrik.untungBersih >= 0 ? "🟢 SURPLUS (UNTUNG)" : "🔴 DEFISIT (RUGI LABA)"]);
+      barisData.push(["💰 Total Omzet Penjualan", omzet, "Pendapatan Kotor Toko"]);
+      barisData.push(["💸 Total Biaya / Pengeluaran", pengeluaran, "Biaya Operasional & Kulakan"]);
+      barisData.push(["💎 Total Pemasukan Tambahan", pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); 
+      barisData.push(["📈 Profit Bersih Toko", untungBersih, untungBersih >= 0 ? "🟢 SURPLUS (UNTUNG)" : "🔴 DEFISIT (RUGI LABA)"]);
       barisData.push([]); 
 
       barisData.push(["📦 DAFTAR PRODUK PALING LARIS (TOP Fast-Moving)"]);
       barisData.push(["Peringkat", "Nama Barang/Produk", "Total Volume Terjual"]);
-      if (metrik.produkTerlaris.length === 0) {
+      if (produkTerlaris.length === 0) {
         barisData.push(["-", "Belum ada produk terjual", "0 Pcs"]);
       } else {
-        metrik.produkTerlaris.forEach((p, idx) => {
+        produkTerlaris.forEach((p, idx) => {
           barisData.push([`Top ${idx + 1}`, p.nama, `${p.qty} Pcs`]);
         });
       }
