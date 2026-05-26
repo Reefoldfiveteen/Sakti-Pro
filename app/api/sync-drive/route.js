@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
-// 🌟 ENDPOINT POST: REKONSILIASI MULTIPLATFORM (TAMBAH, EDIT, HAPUS)
+// 🌟 ENDPOINT POST: HAKIM TIME-MARK OTOMATIS (Mencegah Saling Timpa Buta)
 export async function POST(request) {
   try {
-    const { dataTransaksi, accessToken } = await request.json();
+    const { dataTransaksi, accessToken, deviceSource, timeMark } = await request.json();
 
     if (!dataTransaksi) return NextResponse.json({ success: false, error: "Data transaksi kosong." }, { status: 400 });
     if (!accessToken) return NextResponse.json({ success: false, error: "Token tidak terdeteksi." }, { status: 401 });
 
     const dataIncoming = typeof dataTransaksi === 'string' ? JSON.parse(dataTransaksi) : dataTransaksi;
+    const incomingTimeMark = Number(timeMark) || 0;
 
     const oauth2Client = new google.auth.OAuth2(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
     oauth2Client.setCredentials({ access_token: accessToken });
@@ -35,79 +36,61 @@ export async function POST(request) {
 
     const namaFileDb = "sakti_database.json";
     const listFile = await drive.files.list({
-      q: `name='sakti_database.json' and '${folderId}' in parents and trashed=false`,
-      fields: 'files(id, webViewLink)',
+      q: `name='${namaFileDb}' and '${folderId}' in parents and trashed=false`,
+      fields: 'files(id, webViewLink, description)',
     });
 
-    // 🌟 Jangan langsung di-filter di awal agar bendera isDeleted dari HP bisa dibaca oleh Map
-    let dataFinalToBeSaved = dataIncoming; 
+    let dataFinalToBeSaved = dataIncoming;
     let fileIdExist = null;
     let webViewLink = null;
+    let cloudTimeMark = 0;
 
     if (listFile.data.files.length > 0) {
       fileIdExist = listFile.data.files[0].id;
       webViewLink = listFile.data.files[0].webViewLink;
+      
+      // Membaca metadata timeMark lama yang tersimpan di deskripsi file Drive
+      const cloudDescription = listFile.data.files[0].description || "";
+      if (cloudDescription.includes("timeMark:")) {
+        cloudTimeMark = Number(cloudDescription.split("timeMark:")[1]) || 0;
+      }
 
       try {
-        const downloadExisting = await drive.files.get({ fileId: fileIdExist, alt: 'media' });
-        let dataExistingInCloud = downloadExisting.data;
-        if (typeof dataExistingInCloud === 'string') {
-          dataExistingInCloud = JSON.parse(dataExistingInCloud);
-        }
-
-        if (Array.isArray(dataExistingInCloud) && Array.isArray(dataIncoming)) {
-          const mapGabungan = new Map();
-
-          // 1. Amankan pangkalan data lama dari Cloud ke dalam Map
-          dataExistingInCloud.forEach(item => {
-            const uniqueKey = item.id || `${item.tanggal}-${item.jam}-${item.grand_total}`;
-            mapGabungan.set(uniqueKey, item);
+        // 🌟 ATURAN EMAS IDE RIF: Jika data di cloud ternyata LEBIH BARU daripada data perangkat saat ini,
+        // Tolak proses overwrite, kembalikan sinyal agar frontend melakukan pembaruan otomatis (GET) terlebih dahulu!
+        if (cloudTimeMark > incomingTimeMark) {
+          return NextResponse.json({ 
+            success: true, 
+            outdated: true, 
+            message: "Data di Cloud lebih baru. Tampilan tabel otomatis diperbarui." 
           });
-
-          // 2. Tabrakkan dengan data Incoming (HP/PC) menggunakan Hakim Timestamp 'updatedAt'
-          dataIncoming.forEach(itemIncoming => {
-            const uniqueKey = itemIncoming.id || `${itemIncoming.tanggal}-${itemIncoming.jam}-${itemIncoming.grand_total}`;
-            const itemExisting = mapGabungan.get(uniqueKey);
-
-            if (itemExisting) {
-              // Jika di device ditandai hapus, dan instruksi hapusnya lebih baru/setara -> Valid Hapus
-              if (itemIncoming.isDeleted && (itemIncoming.updatedAt >= (itemExisting.updatedAt || 0))) {
-                mapGabungan.set(uniqueKey, itemIncoming); 
-              } 
-              // Jika di device ada update data biasa (edit) dan waktunya lebih baru -> Terima Perubahan
-              else if (itemIncoming.updatedAt >= (itemExisting.updatedAt || 0)) {
-                mapGabungan.set(uniqueKey, itemIncoming);
-              }
-            } else {
-              // Jika barang baru dan tidak dalam kondisi terhapus -> Masukkan tabel
-              if (!itemIncoming.isDeleted) {
-                mapGabungan.set(uniqueKey, itemIncoming);
-              }
-            }
-          });
-
-          // 3. Eksekusi pembersihan total barang bertanda isDeleted sebelum disimpan ke file JSON Drive
-          dataFinalToBeSaved = Array.from(mapGabungan.values()).filter(item => !item.isDeleted);
         }
-      } catch (errDownload) {
-        console.error("Gagal melakukan merging cloud.", errDownload);
+      } catch (errCheck) {
+        console.error("Gagal verifikasi timeMark cloud.", errCheck);
       }
     }
 
+    // Bungkus payload bersama metadata Device dan TimeMark terbaru ke dalam stream JSON baku
     const payloadStream = JSON.stringify(dataFinalToBeSaved);
-    const mediaStream = { mimeType: 'application/json', body: payloadStream };
+    const mediaStream = { 
+      mimeType: 'application/json', 
+      body: payloadStream 
+    };
+
+    // Buat catatan penanda deskripsi file Google Drive
+    const metaDescription = `device:${deviceSource || 'unknown'}|timeMark:${incomingTimeMark}`;
 
     if (fileIdExist) {
-      // 🌟 FIX POP-UP: Paksa Google API mengembalikan webViewLink saat update file
       const hasilUpdate = await drive.files.update({
         fileId: fileIdExist,
         media: mediaStream,
+        resource: { description: metaDescription },
         fields: 'id, name, webViewLink',
       });
       if (hasilUpdate.data.webViewLink) webViewLink = hasilUpdate.data.webViewLink;
     } else {
       const hasilCreate = await drive.files.create({
-        resource: { name: namaFileDb, parents: [folderId] },
+        resource: { name: namaFileDb, parents: [folderId], description: metaDescription },
         media: mediaStream,
         fields: 'id, name, webViewLink',
       });
@@ -116,8 +99,9 @@ export async function POST(request) {
 
     return NextResponse.json({ 
       success: true, 
+      outdated: false,
       sync_time: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
-      file_link: webViewLink // Tautan dijamin terisi penuh!
+      file_link: webViewLink 
     });
 
   } catch (error) {
@@ -125,7 +109,7 @@ export async function POST(request) {
   }
 }
 
-// 🌟 ENDPOINT GET: AMBIL DATA DARI CLOUD
+// 🌟 ENDPOINT GET: AMBIL DATA DARI CLOUD (TETAP STABIL)
 export async function GET(request) {
   try {
     const authHeader = request.headers.get('authorization');

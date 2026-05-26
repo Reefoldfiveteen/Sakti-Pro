@@ -56,6 +56,12 @@ export default function Home() {
   const audioChunksRef = useRef([]);
   const autoSyncTimerRef = useRef(null);
 
+  // 🌟 DETEKTOR SUMBER PERANGKAT AKURAT (IDE RIF DEVICE MARK)
+  const dapatkanDeviceSource = () => {
+    if (typeof window !== 'undefined' && window.AndroidJSInterface) return 'android';
+    return 'website';
+  };
+
   // 🌟 JEMBATAN AKUN (JAVASCRIPT BRIDGE) UNTUK LOGIN AUTOMATIS NATIVE PERANGKAT ANDROID
   useEffect(() => {
     window.terimaTokenDariAndroid = async (idToken) => {
@@ -96,10 +102,8 @@ export default function Home() {
     const dataLokal = localStorage.getItem('sakti_riwayat_data');
     if (dataLokal) {
       try {
-        // Otomatis urutkan saat pertama kali aplikasi dibuka agar layout rapi
         const parsedData = JSON.parse(dataLokal);
-        const sortedData = urutkanTransaksi(parsedData);
-        setDaftarTransaksi(sortedData);
+        setDaftarTransaksi(urutkanTransaksi(parsedData));
       } catch (e) {
         console.error("Gagal memuat cache lokal.");
       }
@@ -177,7 +181,6 @@ export default function Home() {
     const petaProduk = {};
 
     daftarTransaksi.forEach((t) => {
-      if (t.isDeleted) return; // Abaikan data soft-delete dalam kalkulasi metrik
       const totalGrup = Number(t.grand_total) || 0;
       if (t.jenis === 'Penjualan') {
         omzet += totalGrup;
@@ -212,19 +215,16 @@ export default function Home() {
 
   const metrik = hitungMetrikUMKM();
 
-  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM)
+  // 🌟 FIX TOTAL SORTING ENGINE: Mutlak berbaris dari Tanggal & Jam paling baru ke terlama
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
-      // Bongkar string tanggal "DD/MM/YYYY" menjadi komponen murni [DD, MM, YYYY]
       const partA = a.tanggal.split('/');
       const partB = b.tanggal.split('/');
       
-      // Jika formatnya pakai strip "DD-MM-YYYY", akomodasi juga demi keamanan data cache
       const cleanPartA = partA.length === 3 ? partA : a.tanggal.split('-');
       const cleanPartB = partB.length === 3 ? partB : b.tanggal.split('-');
 
-      // Rakit kembali ke format standar internasional yang dipahami JavaScript: YYYY-MM-DD
       const isoDateA = `${cleanPartA[2]}-${cleanPartA[1]}-${cleanPartA[0]}T${a.jam}`;
       const isoDateB = `${cleanPartB[2]}-${cleanPartB[1]}-${cleanPartB[0]}T${b.jam}`;
 
@@ -233,7 +233,6 @@ export default function Home() {
   };
 
   const simpanKeMemoriLokal = (dataTerbaru) => {
-    // 🌟 Selalu urutkan data sebelum disimpan ke state dan localStorage
     const dataTerurut = urutkanTransaksi(dataTerbaru);
     setDaftarTransaksi(dataTerurut);
     
@@ -241,6 +240,11 @@ export default function Home() {
       localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataTerurut));
     } catch (e) {}
     
+    // Perbarui jejak waktu Time-Mark lokal setiap kali ada perubahan data di device ini
+    try {
+      localStorage.setItem('sakti_last_time_mark', Date.now().toString());
+    } catch (e) {}
+
     if (isLoggedInGDrive) {
       setStatusSync('Perubahan Belum Disinkronkan');
       try {
@@ -296,10 +300,11 @@ export default function Home() {
       if (res.success && res.data) {
         const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
         
-        // Simpan dan urutkan otomatis data hasil tarikan dari cloud
-        simpanKeMemoriLokal(dataCloud);
-        
+        // Simpan data dan set ulang urutannya
+        const dataTerurut = urutkanTransaksi(dataCloud);
+        setDaftarTransaksi(dataTerurut);
         try {
+          localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataTerurut));
           localStorage.setItem('sakti_sync_status', '✨ Data Sinkron dengan Cloud');
         } catch (e) {}
         setStatusSync('✨ Data Sinkron dengan Cloud');
@@ -318,31 +323,46 @@ export default function Home() {
     }
   };
 
+  // 🌟 FIX SYNC LOGIC: Mengirimkan penanda Device Source dan Time-Mark jejak modifikasi terkini
   const handleSyncToGoogleDrive = async () => {
     const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token) { handleLoginGDrive(); return; }
     if (daftarTransaksi.length === 0) { setErrorPesan("Tidak ada data tabel yang bisa dikirim!"); return; }
     setErrorPesan('');
     setIsSyncing(true);
+    
+    const currentDevice = dapatkanDeviceSource();
+    const currentLocalTimeMark = localStorage.getItem('sakti_last_time_mark') || Date.now().toString();
+
     try {
       const response = await fetch('/api/sync-drive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataTransaksi: JSON.stringify(daftarTransaksi), accessToken: token }),
+        body: JSON.stringify({ 
+          dataTransaksi: JSON.stringify(daftarTransaksi), 
+          accessToken: token,
+          deviceSource: currentDevice,
+          timeMark: currentLocalTimeMark
+        }),
       });
       const resData = await response.json();
       if (resData.success) {
-        const pesanSukses = `☁️ Disinkronkan (${resData.sync_time})`;
-        setStatusSync(pesanSukses);
-        try {
-          localStorage.setItem('sakti_sync_status', pesanSukses);
-        } catch (e) {}
+        if (resData.outdated) {
+          // Jika backend mendeteksi data device ini kedaluwarsa, paksa jalankan pemulihan (GET) otomatis!
+          await ambilDataDariDrive(token);
+          alert(resData.message);
+        } else {
+          const pesanSukses = `☁️ Disinkronkan (${resData.sync_time})`;
+          setStatusSync(pesanSukses);
+          try {
+            localStorage.setItem('sakti_sync_status', pesanSukses);
+          } catch (e) {}
+          
+          await ambilDataDariDrive(token);
 
-        // Setelah sukses setor & merge di cloud, langsung tarik kembali data finalnya
-        await ambilDataDariDrive(token);
-
-        if(confirm(`Sukses terunggah & disinkronkan ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
-          window.open(resData.file_link, '_blank');
+          if(confirm(`Sukses terunggah & disinkronkan ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
+            window.open(resData.file_link, '_blank');
+          }
         }
       } else {
         setErrorPesan(resData.error || "Gagal melakukan enkripsi data cloud.");
@@ -357,14 +377,23 @@ export default function Home() {
   const execSyncToDriveSilently = async () => {
     const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token || daftarTransaksi.length === 0) return;
+    
+    const currentDevice = dapatkanDeviceSource();
+    const currentLocalTimeMark = localStorage.getItem('sakti_last_time_mark') || Date.now().toString();
+
     try {
       const response = await fetch('/api/sync-drive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataTransaksi: JSON.stringify(daftarTransaksi), accessToken: token })
+        body: JSON.stringify({ 
+          dataTransaksi: JSON.stringify(daftarTransaksi), 
+          accessToken: token,
+          deviceSource: currentDevice,
+          timeMark: currentLocalTimeMark
+        })
       });
       const resData = await response.json();
-      if (resData.success) {
+      if (resData.success && !resData.outdated) {
         const pesanAuto = `☁️ Auto Sync Aktif (${resData.sync_time})`;
         setStatusSync(pesanAuto);
         try {
@@ -383,6 +412,7 @@ export default function Home() {
         localStorage.removeItem('sakti_token_gdrive');
         localStorage.removeItem('sakti_interval_sync');
         localStorage.removeItem('sakti_sync_status');
+        localStorage.removeItem('sakti_last_time_mark');
         localStorage.setItem('sakti_riwayat_data', JSON.stringify([]));
       } catch (e) {}
       setDaftarTransaksi([]);
@@ -415,7 +445,7 @@ export default function Home() {
         setAudioUrlPreview(url);
         const reader = new FileReader();
         reader.onloadend = () => { setAudioBase64(reader.result); };
-        reader.readAsDataURL(audioBlob);
+        reader.readAsDataURL(file);
         stream.getTracks().forEach(track => track.stop());
       };
       recognitionRef.current = new SpeechRecognition();
@@ -501,6 +531,8 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
+  const { omzet, pengeluaran, pemasukanLain, untungBersih, produkTerlaris, persenJual, persenKeluar, persenMasuk, totalTransaksiCount } = metrik;
+
   const kirimKeBackend = async (tipe, data) => {
     try {
       setErrorPesan(''); setIsLoading(true); 
@@ -511,12 +543,13 @@ export default function Home() {
       });
       const resData = await response.json();
       if (resData.success) {
-        // 🌟 SUNTIKKAN METADATA BARU
+        const timestampLokal = Date.now();
+        const uuidTransaksi = `trx-${timestampLokal}-${Math.random().toString(36).substr(2, 9)}`;
+        
         const transaksiBaru = {
           ...resData.data,
-          id: `trx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ID Unik Mutlak
-          updatedAt: Date.now(),
-          isDeleted: false
+          id: uuidTransaksi, 
+          updatedAt: timestampLokal
         };
         const dataBaru = [transaksiBaru, ...daftarTransaksi];
         simpanKeMemoriLokal(dataBaru);
@@ -531,6 +564,7 @@ export default function Home() {
     }
   };
 
+  // 🌟 FIX MUTASI DATA: Menggunakan parameter indeks array ('tIdx') bawaan asli komponen agar manipulasi baris tabel 100% akurat
   const mulaiModeEdit = (tIdx, iIdx, item) => {
     setEditingItemKey(`${tIdx}-${iIdx}`);
     setEditBarang(item.barang); setEditQty(item.qty); setEditHarga(item.harga);
@@ -543,8 +577,6 @@ export default function Home() {
     
     dataBaru[tIdx].items[iIdx] = { barang: editBarang, qty: q, harga: h, jumlah: q * h };
     dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
-    
-    // 🌟 UPDATE TIMESTAMP MODIFIKASI
     dataBaru[tIdx].updatedAt = Date.now();
     
     simpanKeMemoriLokal(dataBaru);
@@ -559,21 +591,16 @@ export default function Home() {
   const simpanEditGrup = (tIdx) => {
     const dataBaru = [...daftarTransaksi];
     dataBaru[tIdx].tanggal = editTanggal; dataBaru[tIdx].jam = editJam; dataBaru[tIdx].jenis = editJenis;
-    
-    // 🌟 UPDATE TIMESTAMP MODIFIKASI
     dataBaru[tIdx].updatedAt = Date.now();
     
     simpanKeMemoriLokal(dataBaru);
     setEditingGroupIdx(null); 
   };
 
+  // 🌟 FIX INSTAN MURNI HAPUS: Langsung lenyap permanen dari array lokal murni (Sesuai keinginan Rif)
   const handleHapusGrup = (tIdx) => {
     if (confirm("Apakah Anda yakin ingin menghapus seluruh grup transaksi ini beserta item di dalamnya?")) {
-      const dataBaru = [...daftarTransaksi];
-      // 🌟 TANDAI BENDERA DELETED-NYA
-      dataBaru[tIdx].isDeleted = true;
-      dataBaru[tIdx].updatedAt = Date.now();
-      
+      const dataBaru = daftarTransaksi.filter((_, idx) => idx !== tIdx);
       simpanKeMemoriLokal(dataBaru);
     }
   };
@@ -582,31 +609,27 @@ export default function Home() {
     if (confirm("Hapus item barang ini dari detail rekapitulasi transaksi?")) {
       const dataBaru = [...daftarTransaksi];
       dataBaru[tIdx].items = dataBaru[tIdx].items.filter((_, idx) => idx !== iIdx);
-      
       dataBaru[tIdx].updatedAt = Date.now();
 
       if (dataBaru[tIdx].items.length === 0) {
-        dataBaru[tIdx].isDeleted = true;
+        const dataBersih = dataBaru.filter((_, idx) => idx !== tIdx);
+        simpanKeMemoriLokal(dataBersih);
       } else {
         dataBaru[tIdx].grand_total = dataBaru[tIdx].items.reduce((acc, curr) => acc + curr.jumlah, 0);
+        simpanKeMemoriLokal(dataBaru);
       }
-      simpanKeMemoriLokal(dataBaru);
     }
   };
 
   const handleHapusSemuaData = () => {
     if (confirm("Apakah Anda yakin ingin mengosongkan seluruh isi tabel rekap?")) {
       simpanKeMemoriLokal([]);
-      setStatusSync('Belum Sinkron');
-      try {
-        localStorage.setItem('sakti_sync_status', 'Belum Sinkron');
-      } catch (e) {}
     }
   };
 
+  // 🌟 AMAN DARI PRERENDER CRASH: Generator file Excel kasir otomatis
   const handleExportExcel = async () => {
     if (daftarTransaksi.length === 0) return;
-
     try {
       const ExcelJS = require('exceljs');
       const saveAs = require('file-saver');
@@ -624,11 +647,7 @@ export default function Home() {
       barisData.push(["💰 Total Omzet Penjualan", metrik.omzet, "Pendapatan Kotor Toko"]);
       barisData.push(["💸 Total Biaya / Pengeluaran", metrik.pengeluaran, "Biaya Operasional & Kulakan"]);
       barisData.push(["💎 Total Pemasukan Tambahan", metrik.pemasukanLain, "Suntikan Modal / Investasi Non-Jualan"]); 
-      barisData.push([
-        "📈 Profit Bersih Toko", 
-        metrik.untungBersih, 
-        metrik.untungBersih >= 0 ? "🟢 SURPLUS (UNTUNG)" : "🔴 DEFISIT (RUGI LABA)"
-      ]);
+      barisData.push(["📈 Profit Bersih Toko", metrik.untungBersih, metrik.untungBersih >= 0 ? "🟢 SURPLUS (UNTUNG)" : "🔴 DEFISIT (RUGI LABA)"]);
       barisData.push([]); 
 
       barisData.push(["📦 DAFTAR PRODUK PALING LARIS (TOP Fast-Moving)"]);
@@ -647,8 +666,7 @@ export default function Home() {
       barisData.push(["📋 JURNAL RINCIAN DETAIL HISTORI TRANSAKSI TOKO"]);
       barisData.push(["KATEGORI / WAKTU TRANSAKSI", "RINCIAN ITEM BARANG", "QUANTITY (QTY)", "HARGA SATUAN (Rp)", "TOTAL SUBTOTAL (Rp)"]);
 
-      // Hanya masukkan data yang tidak terhapus ke lembar Excel
-      daftarTransaksi.filter(t => !t.isDeleted).forEach((transaksi) => {
+      daftarTransaksi.forEach((transaksi) => {
         barisData.push([
           `📅 ${transaksi.tanggal} (${transaksi.jam} WIB)`, 
           `🔹 [${transaksi.jenis.toUpperCase()}]`, 
@@ -656,71 +674,45 @@ export default function Home() {
           "", 
           `GRAND TOTAL: Rp ${Number(transaksi.grand_total).toLocaleString('id-ID')}`
         ]);
-        
         if (transaksi.items) {
           transaksi.items.forEach((item) => {
-            barisData.push([
-              "↳ detail item", 
-              `📦 ${item.barang}`, 
-              Number(item.qty), 
-              Number(item.harga), 
-              Number(item.jumlah)
-            ]);
+            barisData.push(["↳ detail item", `📦 ${item.barang}`, Number(item.qty), Number(item.harga), Number(item.jumlah)]);
           });
         }
       });
 
       worksheet.addRows(barisData);
-
-      worksheet.columns = [
-        { width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }
-      ];
+      worksheet.columns = [{ width: 32 }, { width: 30 }, { width: 18 }, { width: 20 }, { width: 25 }, { width: 24 }, { width: 35 }];
 
       ['B6', 'B7', 'B8', 'B9'].forEach(cellRef => {
         const cell = worksheet.getCell(cellRef);
-        if (cell.value !== undefined) {
-          cell.numFormat = '#,##0';
-        }
+        if (cell.value !== undefined) cell.numFormat = '#,##0';
       });
 
       worksheet.getCell('F4').value = "📊 VISUALISASI CASHFLOW RATIO (DINAMIS TIGA SEGMEN)";
       worksheet.getCell('F4').font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
 
       worksheet.getCell('F6').value = "🟢 Penjualan (Omzet) :";
-      worksheet.getCell('F6').font = { fontWeight: '600' };
-      worksheet.getCell('G6').value = { 
-        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B6/(B6+B7+B8))*25, 0)) & " " & TEXT(B6/(B6+B7+B8), "0%"), "0%")' 
-      };
+      worksheet.getCell('G6').value = { formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B6/(B6+B7+B8))*25, 0)) & " " & TEXT(B6/(B6+B7+B8), "0%"), "0%")' };
       worksheet.getCell('G6').font = { color: { argb: 'FF10B981' }, bold: true };
 
       worksheet.getCell('F7').value = "🔴 Pengeluaran (Biaya) :";
-      worksheet.getCell('F7').font = { fontWeight: '600' };
-      worksheet.getCell('G7').value = { 
-        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B7/(B6+B7+B8))*25, 0)) & " " & TEXT(B7/(B6+B7+B8), "0%"), "0%")' 
-      };
+      worksheet.getCell('G7').value = { formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B7/(B6+B7+B8))*25, 0)) & " " & TEXT(B7/(B6+B7+B8), "0%"), "0%")' };
       worksheet.getCell('G7').font = { color: { argb: 'FFEF4444' }, bold: true };
 
       worksheet.getCell('F8').value = "🔵 Pemasukan (Suntikan Modal) :";
-      worksheet.getCell('F8').font = { fontWeight: '600' };
-      worksheet.getCell('G8').value = { 
-        formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B8/(B6+B7+B8))*25, 0)) & " " & TEXT(B8/(B6+B7+B8), "0%"), "0%")' 
-      };
+      worksheet.getCell('G8').value = { formula: '=IF((B6+B7+B8)>0, REPT("█", ROUND((B8/(B6+B7+B8))*25, 0)) & " " & TEXT(B8/(B6+B7+B8), "0%"), "0%")' };
       worksheet.getCell('G8').font = { color: { argb: 'FF3F51B5' }, bold: true };
 
       const buffer = await workbook.xlsx.writeBuffer();
       const fileDate = new Date().toISOString().split('T')[0];
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `Laporan_SAKTI_UMKM_Komprehensif_${fileDate}.xlsx`);
-
     } catch (error) {
       console.error("Gagal melakukan ekspor data:", error);
       alert("Terjadi kesalahan teknis saat memproses laporan Excel.");
     }
   };
-
-  // 🌟 PERBAIKAN PRERENDER: Hitung variabel derajat secara lokal dan pastikan safety value di luar template literal global
-  const dJual = metrik.totalTransaksiCount > 0 ? (metrik.omzet / metrik.totalTransaksiCount) * 360 : 120;
-  const dKeluar = metrik.totalTransaksiCount > 0 ? (metrik.pengeluaran / metrik.totalTransaksiCount) * 360 : 120;
 
   return (
     <div style={{ maxWidth: '1150px', margin: isMobile ? '10px auto' : '40px auto', padding: isMobile ? '12px' : '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: theme.bgApp, minHeight: '100vh', transition: 'background-color 0.3s ease' }}>
@@ -736,7 +728,6 @@ export default function Home() {
           </p>
         </div>
 
-        {/* CONTROLLER SWITCH TEMA */}
         <div style={{ display: 'flex', backgroundColor: theme.thBg, padding: '4px', borderRadius: '10px', border: `1px solid ${theme.border}`, width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
           {['light', 'dark', 'system'].map((t) => (
             <button key={t} onClick={() => setModeTema(t)} style={{ flex: isMobile ? 1 : 'none', padding: '6px 12px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', textTransform: 'capitalize', backgroundColor: modeTema === t ? '#4F46E5' : 'transparent', color: modeTema === t ? '#FFFFFF' : theme.textMuted, transition: 'all 0.2s ease' }}>
@@ -746,24 +737,23 @@ export default function Home() {
         </div>
       </div>
 
-
-      {/* PANEL KARTU METRIK UTAMA TOKO (RESPONSIVE GRID) */}
+      {/* PANEL KARTU METRIK UTAMA TOKO */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: isMobile ? '10px' : '20px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: isMurniGelap ? '#065F46' : '#E6F4EA', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#A7F3D0' : '#137333', textTransform: 'uppercase' }}>💰 Total Omzet Penjualan</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.omzet.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#137333', fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {omzet.toLocaleString('id-ID')}</h2>
         </div>
         <div style={{ backgroundColor: isMurniGelap ? '#991B1B' : '#FCE8E6', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#FCA5A5' : '#C5221F', textTransform: 'uppercase' }}>💸 Biaya / Keluar</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pengeluaran.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#C5221F', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {pengeluaran.toLocaleString('id-ID')}</h2>
         </div>
         <div style={{ backgroundColor: isMurniGelap ? '#1E3A8A' : '#E0E7FF', padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <span style={{ fontSize: '11px', fontWeight: '700', color: isMurniGelap ? '#93C5FD' : '#3730A3', textTransform: 'uppercase' }}>💎 Pemasukan Lain</span>
-          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {metrik.pemasukanLain.toLocaleString('id-ID')}</h2>
+          <h2 style={{ margin: '4px 0 0 0', color: isMurniGelap ? '#FFFFFF' : '#3730A3', fontSize: isMobile ? '16px' : '22px', fontWeight: '800' }}>Rp {pemasukanLain.toLocaleString('id-ID')}</h2>
         </div>
-        <div style={{ backgroundColor: metrik.untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: metrik.untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
-          <h2 style={{ margin: '4px 0 0 0', color: theme.textUtama, fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {metrik.untungBersih.toLocaleString('id-ID')}</h2>
+        <div style={{ backgroundColor: untungBersih >= 0 ? (isMurniGelap ? '#312E81' : '#F3F4F6') : (isMurniGelap ? '#7F1D1D' : '#FFF0F0'), padding: isMobile ? '12px' : '20px', borderRadius: '16px', border: `1px solid ${theme.border}`, gridColumn: isMobile ? '1 / span 2' : 'auto' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: untungBersih >= 0 ? '#4F46E5' : '#D93025', textTransform: 'uppercase' }}>📈 Profit Bersih Toko</span>
+          <h2 style={{ margin: '4px 0 0 0', color: theme.textUtama, fontSize: isMobile ? '20px' : '22px', fontWeight: '800' }}>Rp {untungBersih.toLocaleString('id-ID')}</h2>
         </div>
       </div>
 
@@ -771,18 +761,18 @@ export default function Home() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginBottom: '25px' }}>
         <div style={{ backgroundColor: theme.bgCard, padding: '20px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
           <h4 style={{ margin: '0 0 16px 0', color: theme.textUtama, fontWeight: '700', fontSize: '14px' }}>📦 TOP 3 PRODUK TERLARIS (STOK FAST-MOVING)</h4>
-          {metrik.produkTerlaris.length === 0 ? (
+          {produkTerlaris.length === 0 ? (
             <p style={{ fontSize: '13px', color: theme.textMuted, fontStyle: 'italic' }}>Belum ada data barang terjual.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {metrik.produkTerlaris.map((p, idx) => (
+              {produkTerlaris.map((p, idx) => (
                 <div key={idx}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px', color: theme.textUtama, fontWeight: '600' }}>
                     <span>{idx + 1}. {p.nama}</span>
                     <span>{p.qty} Pcs</span>
                   </div>
                   <div style={{ width: '100%', height: '10px', backgroundColor: isMurniGelap ? '#334155' : '#E2E8F0', borderRadius: '10px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min((p.qty / metrik.produkTerlaris[0].qty) * 100, 100)}%`, height: '100%', backgroundColor: '#4F46E5', borderRadius: '10px', transition: 'width 0.5s ease' }}></div>
+                    <div style={{ width: `${Math.min((p.qty / produkTerlaris[0].qty) * 100, 100)}%`, height: '100%', backgroundColor: '#4F46E5', borderRadius: '10px', transition: 'width 0.5s ease' }}></div>
                   </div>
                 </div>
               ))}
@@ -805,13 +795,13 @@ export default function Home() {
               flexShrink: 0 
             }}>
               <span style={{ fontSize: '12px', fontWeight: '800', color: theme.textUtama }}>
-                {metrik.totalTransaksiCount > 0 ? 'Kasir' : '0%'}
+                {totalTransaksiCount > 0 ? 'Kasir' : '0%'}
               </span>
             </div>
             <div style={{ fontSize: '12px', color: theme.textUtama, display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({metrik.persenJual}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({metrik.persenKeluar}%)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({metrik.persenMasuk}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '3px' }}></div>Omzet Dagang ({persenJual}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#EF4444', borderRadius: '3px' }}></div>Operasional / Keluar ({persenKeluar}%)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: isMobile ? 'center' : 'flex-start' }}><div style={{ width: '12px', height: '12px', backgroundColor: '#3F51B5', borderRadius: '3px' }}></div>Suntikan Modal / Masuk ({persenMasuk}%)</div>
             </div>
           </div>
         </div>
@@ -911,11 +901,11 @@ export default function Home() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px', flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'left' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: isMobile ? '100%' : 'auto' }}>
             <h3 style={{ color: theme.textUtama, margin: '0', fontSize: '16px', fontWeight: '700' }}>📋 Rekapitulasi Rincian Barang Transaksi</h3>
-            <span style={{ fontSize: '12px', color: theme.textMuted }}>Jumlah Baris Tabel Saat Ini: {daftarTransaksi.filter(t => !t.isDeleted).length}</span>
+            <span style={{ fontSize: '12px', color: theme.textMuted }}>Jumlah Baris Tabel Saat Ini: {daftarTransaksi.length}</span>
           </div>
           
           <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', flexDirection: isMobile ? 'column' : 'row' }}>
-            {daftarTransaksi.filter(t => !t.isDeleted).length > 0 && (
+            {daftarTransaksi.length > 0 && (
               <button type="button" onClick={handleHapusSemuaData} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: '1px solid #EF4444', backgroundColor: 'transparent', color: '#EF4444', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>🗑️ Kosongkan</button>
             )}
             <button type="button" onClick={handleExportExcel} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#FFFFFF', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>📊 Export Excel</button>
@@ -924,10 +914,10 @@ export default function Home() {
 
         {isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
-            {daftarTransaksi.filter(t => !t.isDeleted).length === 0 ? (
+            {daftarTransaksi.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px', color: theme.textMuted, fontSize: '13px' }}>Belum ada data transaksi.</div>
             ) : (
-              daftarTransaksi.filter(t => !t.isDeleted).map((transaksi, tIdx) => {
+              daftarTransaksi.map((transaksi, tIdx) => {
                 const isGrupSedangEdit = editingGroupIdx === tIdx;
                 return (
                   <div key={`card-grup-${tIdx}`} style={{ backgroundColor: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}`, overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
@@ -1020,10 +1010,10 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {daftarTransaksi.filter(t => !t.isDeleted).length === 0 ? (
+                {daftarTransaksi.length === 0 ? (
                   <tr><td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: theme.textMuted }}>Belum ada data transaksi.</td></tr>
                 ) : (
-                  daftarTransaksi.filter(t => !t.isDeleted).map((transaksi, tIdx) => {
+                  daftarTransaksi.map((transaksi, tIdx) => {
                     const isGrupSedangEdit = editingGroupIdx === tIdx;
                     return [
                       <tr key={`grup-${tIdx}`} style={{ backgroundColor: theme.bgGrupRow, borderBottom: `1px solid ${theme.border}`, fontWeight: '700', fontSize: '13px', color: theme.textUtama }}>
