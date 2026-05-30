@@ -11,6 +11,7 @@ Aplikasi ini mendisrupsi metode kasir konvensional yang kaku dengan memberikan k
 * 📈 **Dashboard Metrik UMKM:** Perhitungan otomatis omset harian, margin keuntungan, dan ringkasan performa toko murni secara real-time.
 * 🔄 **Smart Background Auto-Sync:** Sistem sinkronisasi otomatis yang berjalan di latar belakang untuk memastikan data lokal di browser selalu konsisten dengan pangkalan data cloud (Google Drive API / Cloud database) tanpa mengganggu aktivitas kasir.
 * 📱 **Android WebView Ready (Hybrid Bridge):** Dilengkapi dengan *JavaScript Bridge* (`window.AndroidJSInterface`) yang membuatnya siap dibungkus menjadi aplikasi Android APK murni yang responsif dan mendukung integrasi hardware internal.
+* 📊 **Advanced Excel Reporting (Automated Accounting):** Ekspor seluruh jurnal rincian transaksi harian dan detail barang menjadi file spreadsheet (`.xlsx`) secara instan. Dilengkapi dengan formula laporan dinamis tiga segmen untuk visualisasi perbandingan cashflow toko (*Cashflow Ratio Chart*) menggunakan karakter blok murni (`█`) yang kompatibel di Microsoft Excel maupun Google Sheets.
 
 ## 🏗️ Arsitektur Teknologi
 
@@ -19,6 +20,7 @@ Aplikasi ini mendisrupsi metode kasir konvensional yang kaku dengan memberikan k
 * **AI Integration:** Vercel AI SDK / Google Gemini API (Vision & Structured JSON Output)
 * **Local Storage Management:** React `useRef` Pointers & LocalStorage Core untuk performa rendering ultra-cepat tanpa lag saat entri data massal.
 * **Mobile Framework:** Android Studio WebView Component dengan custom JS-Bridge channel.
+* **Reporting Utilities:** `exceljs` & `file-saver` (Pengolah data arsitektur spreadsheet mutakhir)
 
 ## 🚀 Cara Menjalankan Project (Lokal)
 
