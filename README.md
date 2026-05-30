@@ -5,6 +5,10 @@ SAKTI PRO adalah aplikasi kasir (Point of Sale) modern yang dirancang untuk UMKM
 
 Aplikasi ini mendisrupsi metode kasir konvensional yang kaku dengan memberikan kebebasan kepada pemilik usaha untuk mencatat transaksi secepat mereka berbicara atau memotret lembaran nota grosir.
 
+## 🌐 Live Application URLs
+* **Web App:** [https://sakti-pro.vercel.app/](https://sakti-pro.vercel.app/)
+* **Android APK:** [📲 Klik di Sini untuk Unduh APK](https://github.com/Reefoldfiveteen/Sakti-Pro/raw/main/dist/sakti-pro-release.apk)
+
 ## 🌟 Fitur Utama
 * 📱 **Native APK Distribution:** Tersedia dalam format paket aplikasi Android (`.apk`) siap pakai. Memanfaatkan komponen WebView optimal yang terintegrasi langsung dengan ekosistem perangkat keras ponsel cerdas untuk performa operasional kasir yang lebih *portable*.
 * 🎙️ **Voice Transaction Command:** Catat puluhan transaksi sekaligus hanya dengan mendikte kalimat alami (Contoh: *"Gorengan 5 harga seribu, Bakso 2 mangkok satunya 6 ribu..."*). AI akan otomatis mengekstrak nama barang, kuantitas, dan nominal harga menjadi JSON terstruktur secara real-time.
