@@ -636,9 +636,16 @@ export default function Home() {
       });
       const resData = await response.json();
       if (resData.success) {
-        // 🌟 SUNTIKKAN METADATA BARU
+        // 🌟 MENGUNCI WAKTU & TANGGAL AKTUAL REKAP KASIR HARI INI
+        const waktuSistem = new Date();
+        const liveTanggal = waktuSistem.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\./g, '/'); // Hasil: "31/05/2026"
+        const liveJam = waktuSistem.toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).split(' ')[1] || "00:00"; // Hasil: "05:34"
+
+        // 🌟 SUNTIKKAN METADATA BARU SECARA REAL-TIME
         const transaksiBaru = {
           ...resData.data,
+          tanggal: resData.data.tanggal && resData.data.tanggal !== "2024" ? resData.data.tanggal : liveTanggal,
+          jam: resData.data.jam || liveJam,
           id: `trx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
           updatedAt: Date.now()
         };
