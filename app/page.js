@@ -113,12 +113,13 @@ export default function Home() {
       // Bersihkan timer jika halaman kembali aktif agar tidak terjadi duplikasi eksekusi
       if (timerPemicuSync) clearTimeout(timerPemicuSync);
     };
-
-    window.addEventListener('beforeunload', handleSebelumUserKeluar);
+    //confirmasi close closed
+    //window.addEventListener('beforeunload', handleSebelumUserKeluar);
     window.addEventListener('focus', handleHalamanKembaliFokus);
     
     return () => {
-      window.removeEventListener('beforeunload', handleSebelumUserKeluar);
+      //Confirmasi close closed
+      //window.removeEventListener('beforeunload', handleSebelumUserKeluar);
       window.removeEventListener('focus', handleHalamanKembaliFokus);
       if (timerPemicuSync) clearTimeout(timerPemicuSync);
     };
@@ -349,24 +350,57 @@ export default function Home() {
     }
   }, [modeTema]);
 
-  // RUNNER DETEKTOR AUTO-SYNC BACKGROUND (TIAP JAM / MINGGU)
+  // RUNNER DETEKTOR AUTO-SYNC BACKGROUND (KONSISTEN TANPA RESET SAAT KETIK)
   useEffect(() => {
     if (autoSyncTimerRef.current) clearInterval(autoSyncTimerRef.current);
     if (!isLoggedInGDrive || intervalSync === 'manual') return;
 
-    let waktuInterval = 3600000; 
-    if (intervalSync === 'minggu') {
-      waktuInterval = 3600000 * 24 * 7; 
+    let waktuInterval = 3600000; // Default 1 Jam
+    
+    if (intervalSync === '5menit') {
+      waktuInterval = 5 * 60 * 1000;
+    } else if (intervalSync === '15menit') {
+      waktuInterval = 15 * 60 * 1000;
+    } else if (intervalSync === '30menit') {
+      waktuInterval = 30 * 60 * 1000;
     }
 
-    autoSyncTimerRef.current = setInterval(() => {
-      console.log("[SAKTI Cloud] Memicu sinkronisasi terjadwal otomatis...");
-      execSyncToDriveSilently();
+    autoSyncTimerRef.current = setInterval(async () => {
+      const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
+      // Membaca isi data tabel kasir terbaru dari pangkalan Ref murni
+      if (!token || daftarTransaksiRef.current.length === 0) return;
+
+      console.log("[SAKTI Cloud] Memicu sinkronisasi terjadwal otomatis konsisten...");
+      
+      const currentDevice = dapatkanDeviceSource();
+      const currentLocalTimeMark = localStorage.getItem('sakti_last_time_mark') || Date.now().toString();
+
+      try {
+        const response = await fetch('/api/sync-drive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            dataTransaksi: JSON.stringify(daftarTransaksiRef.current), 
+            accessToken: token,
+            deviceSource: currentDevice,
+            timeMark: currentLocalTimeMark
+          })
+        });
+        const resData = await response.json();
+        if (resData.success && !resData.outdated) {
+          const pesanAuto = `☁️ Auto Sync Aktif (${resData.sync_time})`;
+          setStatusSync(pesanAuto);
+          try { localStorage.setItem('sakti_sync_status', pesanAuto); } catch (e) {}
+        }
+      } catch (e) {
+        console.error("Background auto sync terhambat jaringan.");
+      }
     }, waktuInterval);
 
     localStorage.setItem('sakti_interval_sync', intervalSync);
     return () => clearInterval(autoSyncTimerRef.current);
-  }, [intervalSync, isLoggedInGDrive, daftarTransaksi, tokenCadangan]);
+    // 🌟 daftarTransaksi dibuang dari dependency array agar hitungan mundur menit tidak berulang ke nol saat kasir mengetik
+  }, [intervalSync, isLoggedInGDrive, tokenCadangan]);
 
   // PALET WARNA DYNAMIC VARIABLE
   const theme = {
@@ -428,6 +462,9 @@ export default function Home() {
 
   const dJual = totalTransaksiCount > 0 ? (omzet / totalTransaksiCount) * 360 : 120;
   const dKeluar = totalTransaksiCount > 0 ? (pengeluaran / totalTransaksiCount) * 360 : 120;
+
+  //
+  
 
   const simpanKeMemoriLokal = (dataTerbaru) => {
     const dataTerurut = urutkanTransaksi(dataTerbaru);
@@ -874,8 +911,11 @@ export default function Home() {
               <label htmlFor="sync-select">⏰ Auto Sync:</label>
               <select id="sync-select" value={intervalSync} onChange={(e) => setIntervalSync(e.target.value)} style={{ padding: '4px', fontWeight: '700', border: `1px solid ${theme.border}`, borderRadius: '4px', backgroundColor: theme.bgCard, color: theme.textUtama }}>
                 <option value="manual">Manual Only</option>
+                {/* Rentang waktu krusial penyelamatan cashflow kasir padat */}
+                <option value="5menit">Tiap 5 Menit</option>
+                <option value="15menit">Tiap 15 Menit</option>
+                <option value="30menit">Tiap 30 Menit</option>
                 <option value="jam">Tiap 1 Jam</option>
-                <option value="minggu">Tiap 1 Minggu</option>
               </select>
             </div>
           )}
