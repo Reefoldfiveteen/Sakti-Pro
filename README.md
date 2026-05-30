@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# SAKTI PRO (Sistem Asisten Kasir Pintar Berbasis AI)
 
-## Getting Started
+SAKTI PRO adalah aplikasi kasir (Point of Sale) modern yang dirancang untuk UMKM dan retail dengan memanfaatkan kecerdasan buatan (Generative AI) untuk memproses transaksi secara instan melalui suara (**Voice Dictation**) dan foto nota fisik (**Vision Recognition**). 
 
-First, run the development server:
+Aplikasi ini mendisrupsi metode kasir konvensional yang kaku dengan memberikan kebebasan kepada pemilik usaha untuk mencatat transaksi secepat mereka berbicara atau memotret lembaran nota grosir.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🌟 Fitur Utama
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+* 🎙️ **Voice Transaction Command:** Catat puluhan transaksi sekaligus hanya dengan mendikte kalimat alami (Contoh: *"Gorengan 5 harga seribu, Bakso 2 mangkok satunya 6 ribu..."*). AI akan otomatis mengekstrak nama barang, kuantitas, dan nominal harga menjadi JSON terstruktur secara real-time.
+* 📸 **Vision Nota Parser:** Ambil foto nota pembelian atau struk belanja fisik, unggah ke sistem, dan biarkan AI mengekstrak data tabel barang belanjaan secara otomatis untuk dimasukkan ke sistem kasir.
+* 📈 **Dashboard Metrik UMKM:** Perhitungan otomatis omset harian, margin keuntungan, dan ringkasan performa toko murni secara real-time.
+* 🔄 **Smart Background Auto-Sync:** Sistem sinkronisasi otomatis yang berjalan di latar belakang untuk memastikan data lokal di browser selalu konsisten dengan pangkalan data cloud (Google Drive API / Cloud database) tanpa mengganggu aktivitas kasir.
+* 📱 **Android WebView Ready (Hybrid Bridge):** Dilengkapi dengan *JavaScript Bridge* (`window.AndroidJSInterface`) yang membuatnya siap dibungkus menjadi aplikasi Android APK murni yang responsif dan mendukung integrasi hardware internal.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 🏗️ Arsitektur Teknologi
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+* **Front-End / Core Engine:** Next.js (React) - App Router
+* **Styling & UI:** Tailwind CSS
+* **AI Integration:** Vercel AI SDK / Google Gemini API (Vision & Structured JSON Output)
+* **Local Storage Management:** React `useRef` Pointers & LocalStorage Core untuk performa rendering ultra-cepat tanpa lag saat entri data massal.
+* **Mobile Framework:** Android Studio WebView Component dengan custom JS-Bridge channel.
 
-## Learn More
+## 🚀 Cara Menjalankan Project (Lokal)
 
-To learn more about Next.js, take a look at the following resources:
+1.  **Clone Repositori:**
+    ```bash
+    git clone https://github.com/username/sakti-pro.git
+    cd sakti-pro
+    ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2.  **Instalasi Dependencies:**
+    ```bash
+    npm install
+    ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3.  **Konfigurasi Environment Variables (`.env.local`):**
+    Buat file `.env.local` di root folder dan masukkan API Key yang dibutuhkan:
+    ```env
+    GEMINI_API_KEY=your_gemini_api_key_here
+    NEXT_PUBLIC_BASE_URL=http://localhost:3000
+    ```
 
-## Deploy on Vercel
+4.  **Jalankan Server Development:**
+    ```bash
+    npm run dev
+    ```
+    Buka `http://localhost:3000` di browser Anda untuk melihat aplikasi berjalan.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🛠️ Kontribusi
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Kontribusi selalu terbuka! Jika Anda ingin meningkatkan performa regex parser, memperbaiki performa audio handling, atau menambahkan integrasi printer thermal, silakan lakukan fork pada repositori ini dan kirimkan Pull Request (PR).
+
+---
+Developed with ❤️ for Indonesian UMKM Digitalization.
