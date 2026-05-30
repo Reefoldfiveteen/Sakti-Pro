@@ -62,22 +62,68 @@ export default function Home() {
     return 'website';
   };
 
-  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM)
+  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM TERBARU)
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
-      const partA = a.tanggal.split('/');
-      const partB = b.tanggal.split('/');
-      
-      const cleanPartA = partA.length === 3 ? partA : a.tanggal.split('-');
-      const cleanPartB = partB.length === 3 ? partB : b.tanggal.split('-');
+      const tA = a.tanggal.trim();
+      const tB = b.tanggal.trim();
 
-      const isoDateA = `${cleanPartA[2]}-${cleanPartA[1]}-${cleanPartA[0]}T${a.jam}`;
-      const isoDateB = `${cleanPartB[2]}-${cleanPartB[1]}-${cleanPartB[0]}T${b.jam}`;
+      const partA = tA.includes('/') ? tA.split('/') : tA.split('-');
+      const partB = tB.includes('/') ? tB.split('/') : tB.split('-');
+
+      const tahunA = partA[2]?.length === 4 ? partA[2] : partA[0];
+      const bulanA = partA[1];
+      const hariA = partA[2]?.length === 4 ? partA[0] : partA[2];
+
+      const tahunB = partB[2]?.length === 4 ? partB[2] : partB[0];
+      const bulanB = partB[1];
+      const hariB = partB[2]?.length === 4 ? partB[0] : partB[2];
+
+      const isoDateA = `${tahunA}-${bulanA?.padStart(2, '0')}-${hariA?.padStart(2, '0')}T${a.jam}`;
+      const isoDateB = `${tahunB}-${bulanB?.padStart(2, '0')}-${hariB?.padStart(2, '0')}T${b.jam}`;
 
       return new Date(isoDateB) - new Date(isoDateA);
     });
   };
+
+// 自由 🟢 ENGINE PENYELAMAT DATA: OTOMATIS SAVE CLOUD JIKA USER BATAL MENUTUP TAB/REFRESH
+  useEffect(() => {
+    let timerPemicuSync = null;
+
+    const handleSebelumUserKeluar = (e) => {
+      const statusSyncSekarang = localStorage.getItem('sakti_sync_status') || '';
+      
+      if (isLoggedInGDrive && statusSyncSekarang === 'Perubahan Belum Disinkronkan') {
+        e.preventDefault();
+        e.returnValue = "Simpan data ke cloud terlebih dahulu?";
+
+        // 🌟 TRIK JITU: Ketika user klik "Cancel" (Stay on site), halaman akan memicu event fokus kembali.
+        // Kita set timer pendek untuk langsung menyelamatkan data ke Google Drive Cloud otomatis!
+        timerPemicuSync = setTimeout(() => {
+          console.log("[SAKTI Interceptor] Melakukan auto-sync penyelamatan database kasir...");
+          handleSyncToGoogleDrive(false);
+        }, 1000);
+
+        return "Simpan data ke cloud terlebih dahulu?";
+      }
+    };
+
+    const handleHalamanKembaliFokus = () => {
+      // Bersihkan timer jika halaman kembali aktif agar tidak terjadi duplikasi eksekusi
+      if (timerPemicuSync) clearTimeout(timerPemicuSync);
+    };
+
+    window.addEventListener('beforeunload', handleSebelumUserKeluar);
+    window.addEventListener('focus', handleHalamanKembaliFokus);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleSebelumUserKeluar);
+      window.removeEventListener('focus', handleHalamanKembaliFokus);
+      if (timerPemicuSync) clearTimeout(timerPemicuSync);
+    };
+  }, [isLoggedInGDrive, daftarTransaksi]);
+
 
   // 🌟 MULTI-TOKEN RESOLVER SINKRONISASI
   const ambilDataDariDrive = async (tokenAktif) => {
@@ -92,12 +138,9 @@ export default function Home() {
       const res = await response.json();
       if (res.success && res.data) {
         const dataCloud = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+        simpanKeMemoriLokal(dataCloud);
         
-        // Simpan data dan set urutan kronologisnya
-        const dataTerurut = urutkanTransaksi(dataCloud);
-        setDaftarTransaksi(dataTerurut);
         try {
-          localStorage.setItem('sakti_riwayat_data', JSON.stringify(dataTerurut));
           localStorage.setItem('sakti_sync_status', '✨ Data Sinkron dengan Cloud');
         } catch (e) {}
         setStatusSync('✨ Data Sinkron dengan Cloud');
@@ -117,7 +160,7 @@ export default function Home() {
   };
 
   // 🌟 SINKRONISASI STRATEGI IDE RIF: Kirim payload beserta penanda Device Source dan Time-Mark
-  const handleSyncToGoogleDrive = async () => {
+  const handleSyncToGoogleDrive = async (jalurKeluarOtomatis = false) => {
     const token = tokenCadangan || localStorage.getItem('sakti_token_gdrive');
     if (!token) { handleLoginGDrive(); return; }
     if (daftarTransaksi.length === 0) { setErrorPesan("Tidak ada data tabel yang bisa dikirim!"); return; }
@@ -147,10 +190,23 @@ export default function Home() {
           const pesanSukses = `☁️ Disinkronkan (${resData.sync_time})`;
           setStatusSync(pesanSukses);
           try {
-            localStorage.setItem('sakti_sync_status', pesanSukses);
+            localStorage.setItem('sakti_sync_status', '✨ Data Sinkron dengan Cloud');
           } catch (e) {}
 
           await ambilDataDariDrive(token);
+
+          // 🌟 SUNTIKKAN LOGIKA INTERSEPTOR KELUAR OTOMATIS DI SINI:
+          if (jalurKeluarOtomatis) {
+            alert("Auto-Sync Berhasil! Aplikasi akan otomatis diamankan & ditutup.");
+            if (typeof window !== 'undefined') {
+              if (window.AndroidJSInterface && window.AndroidJSInterface.tutupAplikasiNative) {
+                window.AndroidJSInterface.tutupAplikasiNative(); // Jalur Aplikasi APK Android
+              } else {
+                window.close(); // Jalur Browser Web Laptop
+              }
+            }
+            return; // Stop di sini, jangan memunculkan dialog kustom confirm folder Drive lagi
+          }
 
           if(confirm(`Sukses terunggah & disinkronkan ke Google Drive Anda!\nApakah Anda ingin membuka folder backup sekarang?`)) {
             window.open(resData.file_link, '_blank');
@@ -194,6 +250,25 @@ export default function Home() {
       }
     } catch (e) {
       console.error("Background auto sync terhambat jaringan.");
+    }
+  };
+
+  const handleLogoutGDrive = () => {
+    if (confirm("Apakah Anda yakin ingin memutuskan akun Google Drive? Seluruh data tabel lokal akan dikosongkan demi keamanan privasi.")) {
+      if (autoSyncTimerRef.current) clearInterval(autoSyncTimerRef.current);
+      try {
+        localStorage.removeItem('sakti_token_gdrive');
+        localStorage.removeItem('sakti_interval_sync');
+        localStorage.removeItem('sakti_sync_status');
+        localStorage.removeItem('sakti_last_time_mark');
+        localStorage.setItem('sakti_riwayat_data', JSON.stringify([]));
+      } catch (e) {}
+      setDaftarTransaksi([]);
+      setTokenCadangan(null);
+      setIsLoggedInGDrive(false);
+      setIntervalSync('manual');
+      setStatusSync('Belum Terhubung Cloud');
+      alert("Akun Drive berhasil dilepas. Sistem kembali steril.");
     }
   };
 
@@ -404,25 +479,6 @@ export default function Home() {
     } catch (err) {
       setErrorPesan(err.message || "Gagal mematangkan komponen OAuth Google.");
       setIsSyncing(false);
-    }
-  };
-
-  const handleLogoutGDrive = () => {
-    if (confirm("Apakah Anda yakin ingin memutuskan akun Google Drive? Seluruh data tabel lokal akan dikosongkan demi keamanan privasi.")) {
-      if (autoSyncTimerRef.current) clearInterval(autoSyncTimerRef.current);
-      try {
-        localStorage.removeItem('sakti_token_gdrive');
-        localStorage.removeItem('sakti_interval_sync');
-        localStorage.removeItem('sakti_sync_status');
-        localStorage.removeItem('sakti_last_time_mark');
-        localStorage.setItem('sakti_riwayat_data', JSON.stringify([]));
-      } catch (e) {}
-      setDaftarTransaksi([]);
-      setTokenCadangan(null);
-      setIsLoggedInGDrive(false);
-      setIntervalSync('manual');
-      setStatusSync('Belum Terhubung Cloud');
-      alert("Akun Drive berhasil dilepas. Sistem kembali steril.");
     }
   };
 
@@ -715,8 +771,11 @@ export default function Home() {
       {/* HEADER LOGO COMPONENT */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px', flexDirection: isMobile ? 'column' : 'row', gap: '15px' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: '2px', marginLeft: isMobile ? '0px' : '-15px' }}>
-            <LogoSakti id="LogoUtamaSakti" isDark={isMurniGelap} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ marginBottom: '2px', marginLeft: isMobile ? '0px' : '-15px' }}>
+              <LogoSakti id="LogoUtamaSakti" isDark={isMurniGelap} />
+            </div>
+
           </div>
           <p style={{ color: theme.textMuted, marginTop: '-5px', marginLeft: isMobile ? '0px' : '15px', margin: '0', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px', fontStyle: 'italic' }}>
             "Dikte Transaksinya, Amankan Keuangannya, Kuasai Pasarnya."
