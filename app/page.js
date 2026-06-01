@@ -10,6 +10,8 @@ export default function Home() {
   const [daftarTransaksi, setDaftarTransaksi] = useState([]);
   const [errorPesan, setErrorPesan] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // 🌟 STATE UNTUK KONTROL SORTING TABEL KASIR
+  const [pilihanSort, setPilihanSort] = useState('terbaru'); // Opsi: terbaru, terlama, terbesar
   
   // 🌟 ENGINE DETEKTOR RESPONSIVE LIVE WINDOW WIDTH
   const [lebarLayar, setLebarLayar] = useState(typeof window !== 'undefined' ? window.innerWidth : 1150);
@@ -62,52 +64,40 @@ export default function Home() {
     return 'website';
   };
 
-  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING UNIVERSAL V2 (ANTI-ERROR ZONA WAKTU)
-  const urutkanTransaksi = (data) => {
-    if (!Array.isArray(data)) return [];
+  // 🌟 ENGINE SORTING DINAMIS (ANTI-CRASH)
+  const urutkanTransaksi = (data, tipeSort = pilihanSort) => {
+    if (!Array.isArray(data) || data.length === 0) return [];
+    
     return [...data].sort((a, b) => {
-      const dapatkanTimestamp = (tglStr, jamStr) => {
-        const tgl = String(tglStr).trim();
-        // Pastikan format jam selalu HH:MM
-        let jam = String(jamStr).trim() || "00:00";
-        if (jam.length === 4 && !jam.includes(':')) {
-          jam = `${jam.substr(0, 2)}:${jam.substr(2, 2)}`;
+      // Pembacaan Timestamp Aman
+      const hitungTime = (tglStr, jamStr) => {
+        if (!tglStr) return 0;
+        const cleanTgl = String(tglStr).trim().replace(/\//g, '-');
+        const cleanJam = String(jamStr).trim() || "00:00";
+        
+        let parts = cleanTgl.split('-');
+        let isoStr = "";
+        
+        if (parts[0].length === 4) {
+          isoStr = `${parts[0]}-${String(parts[1]).padStart(2, '0')}-${String(parts[2]).padStart(2, '0')}T${cleanJam}`;
+        } else if (parts[2]?.length === 4) {
+          isoStr = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}T${cleanJam}`;
+        } else {
+          return 0;
         }
-
-        // Jalur 1: Jika format menggunakan garis miring (DD/MM/YYYY), ubah dulu ke format standar YYYY-MM-DD
-        if (tgl.includes('/')) {
-          const parts = tgl.split('/');
-          if (parts[0].length === 4) {
-            // Format YYYY/MM/DD
-            return Date.parse(`${parts[0]}-${parts[1]}-${parts[2]}T${jam}`);
-          } else {
-            // Format DD/MM/YYYY
-            return Date.parse(`${parts[2]}-${parts[1]}-${parts[0]}T${jam}`);
-          }
-        }
-
-        // Jalur 2: Jika format sudah menggunakan strip (YYYY-MM-DD atau DD-MM-YYYY)
-        if (tgl.includes('-')) {
-          const parts = tgl.split('-');
-          if (parts[0].length === 4) {
-            // Format YYYY-MM-DD
-            return Date.parse(`${parts[0]}-${parts[1]}-${parts[2]}T${jam}`);
-          } else {
-            // Format DD-MM-YYYY
-            return Date.parse(`${parts[2]}-${parts[1]}-${parts[0]}T${jam}`);
-          }
-        }
-
-        // Fallback terakhir jika string tidak berpola
-        const parsedMurni = Date.parse(`${tgl}T${jam}`);
-        return isNaN(parsedMurni) ? 0 : parsedMurni;
+        
+        const parseResult = Date.parse(isoStr);
+        return isNaN(parseResult) ? 0 : parseResult;
       };
 
-      const timeA = dapatkanTimestamp(a.tanggal, a.jam);
-      const timeB = dapatkanTimestamp(b.tanggal, b.jam);
-
-      // Urutkan berdasarkan waktu terbaru (Descending)
-      return timeB - timeA;
+      if (tipeSort === 'terlama') {
+        return hitungTime(a.tanggal, a.jam) - hitungTime(b.tanggal, b.jam);
+      } else if (tipeSort === 'terbesar') {
+        return (Number(b.grand_total) || 0) - (Number(a.grand_total) || 0);
+      } else {
+        // Default: 'terbaru'
+        return hitungTime(b.tanggal, b.jam) - hitungTime(a.tanggal, a.jam);
+      }
     });
   };
 
@@ -373,6 +363,14 @@ export default function Home() {
       setIsMurniGelap(modeTema === 'dark');
     }
   }, [modeTema]);
+
+
+  // 🌟 TRIGGER RE-SORT KETIKA PILIHAN DROPDOWN BERUBAH
+  useEffect(() => {
+    if (daftarTransaksi.length > 0) {
+      setDaftarTransaksi(urutkanTransaksi(daftarTransaksi));
+    }
+  }, [pilihanSort]);
 
   // RUNNER DETEKTOR AUTO-SYNC BACKGROUND (KONSISTEN TANPA RESET SAAT KETIK)
   useEffect(() => {
@@ -1043,7 +1041,18 @@ export default function Home() {
             <span style={{ fontSize: '12px', color: theme.textMuted }}>Jumlah Baris Tabel Saat Ini: {daftarTransaksi.length}</span>
           </div>
           
-          <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', flexDirection: isMobile ? 'column' : 'row' }}>
+          <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center' }}>
+            
+            {/* 🌟 UI DROPDOWN SORT BY MODERN */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', backgroundColor: isMurniGelap ? '#0F172A' : '#F1F5F9', padding: '6px 12px', borderRadius: '8px', color: theme.textUtama, border: `1px solid ${theme.border}`, width: isMobile ? '100%' : 'auto' }}>
+              <label htmlFor="sort-select" style={{ fontWeight: '700' }}>排序 Sort:</label>
+              <select id="sort-select" value={pilihanSort} onChange={(e) => setPilihanSort(e.target.value)} style={{ padding: '4px', fontWeight: '700', border: 'none', borderRadius: '4px', backgroundColor: theme.bgCard, color: theme.textUtama, cursor: 'pointer' }}>
+                <option value="terbaru">⏰ Waktu Terbaru</option>
+                <option value="terlama">⏳ Waktu Terlama</option>
+                <option value="terbesar">💰 Nominal Terbesar</option>
+              </select>
+            </div>
+
             {daftarTransaksi.length > 0 && (
               <button type="button" onClick={handleHapusSemuaData} disabled={isLoading} style={{ flex: 1, padding: '10px 18px', borderRadius: '8px', border: '1px solid #EF4444', backgroundColor: 'transparent', color: '#EF4444', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>🗑️ Kosongkan</button>
             )}
