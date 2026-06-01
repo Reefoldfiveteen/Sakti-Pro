@@ -11,7 +11,7 @@ export default function Home() {
   const [errorPesan, setErrorPesan] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   // 🌟 STATE UNTUK KONTROL SORTING TABEL KASIR
-  const [pilihanSort, setPilihanSort] = useState('terbaru'); // Opsi: terbaru, terlama, terbesar
+  const [pilihanSort, setPilihanSort] = useState('terlama'); // Opsi: terbaru, terlama, terbesar
   
   // 🌟 ENGINE DETEKTOR RESPONSIVE LIVE WINDOW WIDTH
   const [lebarLayar, setLebarLayar] = useState(typeof window !== 'undefined' ? window.innerWidth : 1150);
@@ -1045,7 +1045,7 @@ export default function Home() {
             
             {/* 🌟 UI DROPDOWN SORT BY MODERN */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', backgroundColor: isMurniGelap ? '#0F172A' : '#F1F5F9', padding: '6px 12px', borderRadius: '8px', color: theme.textUtama, border: `1px solid ${theme.border}`, width: isMobile ? '100%' : 'auto' }}>
-              <label htmlFor="sort-select" style={{ fontWeight: '700' }}>排序 Sort:</label>
+              <label htmlFor="sort-select" style={{ fontWeight: '700' }}>Urutkan:</label>
               <select id="sort-select" value={pilihanSort} onChange={(e) => setPilihanSort(e.target.value)} style={{ padding: '4px', fontWeight: '700', border: 'none', borderRadius: '4px', backgroundColor: theme.bgCard, color: theme.textUtama, cursor: 'pointer' }}>
                 <option value="terlama">⏰ Waktu Terbaru</option>
                 <option value="terbaru">⏳ Waktu Terlama</option>
