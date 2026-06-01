@@ -1047,8 +1047,8 @@ export default function Home() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', backgroundColor: isMurniGelap ? '#0F172A' : '#F1F5F9', padding: '6px 12px', borderRadius: '8px', color: theme.textUtama, border: `1px solid ${theme.border}`, width: isMobile ? '100%' : 'auto' }}>
               <label htmlFor="sort-select" style={{ fontWeight: '700' }}>排序 Sort:</label>
               <select id="sort-select" value={pilihanSort} onChange={(e) => setPilihanSort(e.target.value)} style={{ padding: '4px', fontWeight: '700', border: 'none', borderRadius: '4px', backgroundColor: theme.bgCard, color: theme.textUtama, cursor: 'pointer' }}>
-                <option value="terbaru">⏰ Waktu Terbaru</option>
-                <option value="terlama">⏳ Waktu Terlama</option>
+                <option value="terlama">⏰ Waktu Terbaru</option>
+                <option value="terbaru">⏳ Waktu Terlama</option>
                 <option value="terbesar">💰 Nominal Terbesar</option>
               </select>
             </div>
