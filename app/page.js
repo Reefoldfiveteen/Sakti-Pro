@@ -62,51 +62,52 @@ export default function Home() {
     return 'website';
   };
 
-  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING UNIVERSAL (URUTKAN DARI WAKTU TERBARU)
+  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING UNIVERSAL V2 (ANTI-ERROR ZONA WAKTU)
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
-      // Fungsi pembantu untuk mengubah string tanggal acak menjadi format ISO standar yang valid
-      const normalisasiKeDate = (tglStr, jamStr) => {
-        const cleanTgl = String(tglStr).trim();
-        const cleanJam = String(jamStr).trim() || "00:00";
-        
-        let tahun, bulan, hari;
-
-        if (cleanTgl.includes('-')) {
-          // Menangani format YYYY-MM-DD atau DD-MM-YYYY
-          const parts = cleanTgl.split('-');
-          if (parts[0].length === 4) {
-            [tahun, bulan, hari] = parts;
-          } else {
-            [hari, bulan, tahun] = parts;
-          }
-        } else if (cleanTgl.includes('/')) {
-          // Menangani format DD/MM/YYYY atau YYYY/MM/YYYY
-          const parts = cleanTgl.split('/');
-          if (parts[0].length === 4) {
-            [tahun, bulan, hari] = parts;
-          } else {
-            [hari, bulan, tahun] = parts;
-          }
-        } else {
-          // Fallback jika format rusak atau tidak terdeteksi
-          return new Date(0); 
+      const dapatkanTimestamp = (tglStr, jamStr) => {
+        const tgl = String(tglStr).trim();
+        // Pastikan format jam selalu HH:MM
+        let jam = String(jamStr).trim() || "00:00";
+        if (jam.length === 4 && !jam.includes(':')) {
+          jam = `${jam.substr(0, 2)}:${jam.substr(2, 2)}`;
         }
 
-        // Susun menjadi format ISO string: YYYY-MM-DDTHH:mm:00
-        const isoString = `${tahun}-${String(bulan).padStart(2, '0')}-${String(hari).padStart(2, '0')}T${cleanJam}:00`;
-        const dateObj = new Date(isoString);
-        
-        // Jika hasil konversi tidak valid (NaN), kembalikan waktu paling awal
-        return isNaN(dateObj.getTime()) ? new Date(0) : dateObj;
+        // Jalur 1: Jika format menggunakan garis miring (DD/MM/YYYY), ubah dulu ke format standar YYYY-MM-DD
+        if (tgl.includes('/')) {
+          const parts = tgl.split('/');
+          if (parts[0].length === 4) {
+            // Format YYYY/MM/DD
+            return Date.parse(`${parts[0]}-${parts[1]}-${parts[2]}T${jam}`);
+          } else {
+            // Format DD/MM/YYYY
+            return Date.parse(`${parts[2]}-${parts[1]}-${parts[0]}T${jam}`);
+          }
+        }
+
+        // Jalur 2: Jika format sudah menggunakan strip (YYYY-MM-DD atau DD-MM-YYYY)
+        if (tgl.includes('-')) {
+          const parts = tgl.split('-');
+          if (parts[0].length === 4) {
+            // Format YYYY-MM-DD
+            return Date.parse(`${parts[0]}-${parts[1]}-${parts[2]}T${jam}`);
+          } else {
+            // Format DD-MM-YYYY
+            return Date.parse(`${parts[2]}-${parts[1]}-${parts[0]}T${jam}`);
+          }
+        }
+
+        // Fallback terakhir jika string tidak berpola
+        const parsedMurni = Date.parse(`${tgl}T${jam}`);
+        return isNaN(parsedMurni) ? 0 : parsedMurni;
       };
 
-      const dateA = normalisasiKeDate(a.tanggal, a.jam);
-      const dateB = normalisasiKeDate(b.tanggal, b.jam);
+      const timeA = dapatkanTimestamp(a.tanggal, a.jam);
+      const timeB = dapatkanTimestamp(b.tanggal, b.jam);
 
-      // Urutkan murni secara kronologis dari waktu paling baru (Descencing)
-      return dateB - dateA;
+      // Urutkan berdasarkan waktu terbaru (Descending)
+      return timeB - timeA;
     });
   };
 
