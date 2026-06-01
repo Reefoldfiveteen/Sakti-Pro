@@ -62,28 +62,51 @@ export default function Home() {
     return 'website';
   };
 
-  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING (URUTKAN BERDASARKAN TANGGAL DAN JAM TERBARU)
+  // 🌟 ENGINE UTAMA CHRONOLOGICAL SORTING UNIVERSAL (URUTKAN DARI WAKTU TERBARU)
   const urutkanTransaksi = (data) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
-      const tA = a.tanggal.trim();
-      const tB = b.tanggal.trim();
+      // Fungsi pembantu untuk mengubah string tanggal acak menjadi format ISO standar yang valid
+      const normalisasiKeDate = (tglStr, jamStr) => {
+        const cleanTgl = String(tglStr).trim();
+        const cleanJam = String(jamStr).trim() || "00:00";
+        
+        let tahun, bulan, hari;
 
-      const partA = tA.includes('/') ? tA.split('/') : tA.split('-');
-      const partB = tB.includes('/') ? tB.split('/') : tB.split('-');
+        if (cleanTgl.includes('-')) {
+          // Menangani format YYYY-MM-DD atau DD-MM-YYYY
+          const parts = cleanTgl.split('-');
+          if (parts[0].length === 4) {
+            [tahun, bulan, hari] = parts;
+          } else {
+            [hari, bulan, tahun] = parts;
+          }
+        } else if (cleanTgl.includes('/')) {
+          // Menangani format DD/MM/YYYY atau YYYY/MM/YYYY
+          const parts = cleanTgl.split('/');
+          if (parts[0].length === 4) {
+            [tahun, bulan, hari] = parts;
+          } else {
+            [hari, bulan, tahun] = parts;
+          }
+        } else {
+          // Fallback jika format rusak atau tidak terdeteksi
+          return new Date(0); 
+        }
 
-      const tahunA = partA[2]?.length === 4 ? partA[2] : partA[0];
-      const bulanA = partA[1];
-      const hariA = partA[2]?.length === 4 ? partA[0] : partA[2];
+        // Susun menjadi format ISO string: YYYY-MM-DDTHH:mm:00
+        const isoString = `${tahun}-${String(bulan).padStart(2, '0')}-${String(hari).padStart(2, '0')}T${cleanJam}:00`;
+        const dateObj = new Date(isoString);
+        
+        // Jika hasil konversi tidak valid (NaN), kembalikan waktu paling awal
+        return isNaN(dateObj.getTime()) ? new Date(0) : dateObj;
+      };
 
-      const tahunB = partB[2]?.length === 4 ? partB[2] : partB[0];
-      const bulanB = partB[1];
-      const hariB = partB[2]?.length === 4 ? partB[0] : partB[2];
+      const dateA = normalisasiKeDate(a.tanggal, a.jam);
+      const dateB = normalisasiKeDate(b.tanggal, b.jam);
 
-      const isoDateA = `${tahunA}-${bulanA?.padStart(2, '0')}-${hariA?.padStart(2, '0')}T${a.jam}`;
-      const isoDateB = `${tahunB}-${bulanB?.padStart(2, '0')}-${hariB?.padStart(2, '0')}T${b.jam}`;
-
-      return new Date(isoDateB) - new Date(isoDateA);
+      // Urutkan murni secara kronologis dari waktu paling baru (Descencing)
+      return dateB - dateA;
     });
   };
 
