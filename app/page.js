@@ -636,16 +636,30 @@ export default function Home() {
       });
       const resData = await response.json();
       if (resData.success) {
-        // 🌟 MENGUNCI WAKTU & TANGGAL AKTUAL REKAP KASIR HARI INI
-        const waktuSistem = new Date();
-        const liveTanggal = waktuSistem.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\./g, '/'); // Hasil: "31/05/2026"
-        const liveJam = waktuSistem.toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).split(' ')[1] || "00:00"; // Hasil: "05:34"
+        // 🌟 AMBIL WAKTU REAL-TIME DETIK INI JUGA (TAHUN 2026)
+        const sekarang = new Date();
+        
+        // Buat format standar YYYY-MM-DD agar seragam dan lolos chronological sorting
+        const tahun = sekarang.getFullYear();
+        const bulan = String(sekarang.getMonth() + 1).padStart(2, '0');
+        const hari = String(sekarang.getDate()).padStart(2, '0');
+        const liveTanggal = `${tahun}-${bulan}-${hari}`; // Hasil: "2026-06-02"
 
-        // 🌟 SUNTIKKAN METADATA BARU SECARA REAL-TIME
+        const liveJam = sekarang.toLocaleTimeString('id-ID', { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          hour12: false 
+        }); // Hasil: "03:59" atau jam laptopmu sekarang
+
+        // Ambil data tanggal dari AI jika ada, lalu cek apakah mengandung tahun eror 2024
+        const tanggalDariAI = resData.data.tanggal ? String(resData.data.tanggal) : '';
+        const apakahTahunEror = tanggalDariAI.includes('2024') || tanggalDariAI === '';
+
+        // 🌟 SUNTIKKAN METADATA BARU SECARA PAKSA & VALID
         const transaksiBaru = {
           ...resData.data,
-          tanggal: resData.data.tanggal && resData.data.tanggal !== "2024" ? resData.data.tanggal : liveTanggal,
-          jam: resData.data.jam || liveJam,
+          tanggal: apakahTahunEror ? liveTanggal : tanggalDariAI,
+          jam: (resData.data.jam && !apakahTahunEror) ? resData.data.jam : liveJam,
           id: `trx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
           updatedAt: Date.now()
         };
