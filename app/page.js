@@ -1240,6 +1240,24 @@ export default function Home() {
         )}
       </div>
 
+    {/* FOOTER */}
+      <div style={{ 
+        marginTop: '40px', 
+        paddingTop: '20px', 
+        borderTop: `1px solid ${theme.border}`, 
+        textAlign: 'center', 
+        fontSize: '12px', 
+        color: theme.textMuted,
+        fontWeight: '500'
+      }}>
+        <p style={{ margin: '0 0 4px 0' }}>
+          <strong>SAKTI PRO</strong> v1.0.0
+        </p>
+        <p style={{ margin: '0' }}>
+          © {new Date().getFullYear()} Arif Purnomo Aji
+        </p>
+      </div>
+
     </div>
   );
 }
