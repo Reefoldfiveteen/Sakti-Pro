@@ -69,5 +69,10 @@ Bagi pengguna atau reviewer yang ingin menguji langsung aplikasi **SAKTI PRO** d
 
 Kontribusi selalu terbuka! Jika Anda ingin meningkatkan performa regex parser, memperbaiki performa audio handling, atau menambahkan integrasi printer thermal, silakan lakukan fork pada repositori ini dan kirimkan Pull Request (PR).
 
+## Deklarasi Pemanfaatan AI: 
+
+Proyek ini dikembangkan secara kolaboratif menggunakan bantuan model bahasa besar (Google Gemini AI) sebagai asisten pemrograman (AI Coding Companion). Gemini dilibatkan secara aktif dalam proses pencarian solusi (troubleshooting), optimasi logika algoritma chronological sorting layout, penataan arsitektur fail-safe state management, serta penyusunan formula dinamis tiga segmen untuk laporan spreadsheet Excel.
+
+
 ---
 Developed with ❤️ for Indonesian UMKM Digitalization.
